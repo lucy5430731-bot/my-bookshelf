@@ -148,7 +148,7 @@
       btn.innerText = '🔍 正在搜尋分析中...';
       btn.disabled = true;
 
-      const systemPrompt = "你是一個專業圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。範例連結: https://www.books.com.tw/seek/exep/main_search.php?key=... ";
+      const systemPrompt = "你是一個專業圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。博客來連結請優先使用此搜尋格式：https://www.books.com.tw/seek/exep/main_search.php?key=【ISBN或關鍵字】";
       const jsonSchema = {
         type: "OBJECT",
         properties: {
@@ -180,6 +180,18 @@
         });
 
         const data = await response.json();
+
+        // 檢查 API 是否回傳錯誤
+        if (data.error) {
+          alert(`Google API 呼叫失敗：${data.error.message} (錯誤碼: ${data.error.code})`);
+          return;
+        }
+
+        if (!data.candidates || !data.candidates[0]?.content?.parts[0]?.text) {
+          alert('未能順利取得資料，請確認 API Key 是否正確或改用中文書名搜尋。');
+          return;
+        }
+
         const bookData = JSON.parse(data.candidates[0].content.parts[0].text);
 
         // 填入表單
@@ -197,10 +209,13 @@
         if (bookData.cover_image_url) {
           document.getElementById('coverUrl').value = bookData.cover_image_url;
           updateCoverPreview(bookData.cover_image_url);
+        } else {
+          document.getElementById('coverUrl').value = '';
+          updateCoverPreview('');
         }
 
       } catch (err) {
-        alert('抓取資料失敗，請確認 API Key 是否正確或試試別的書名。');
+        alert('發生連線錯誤或解析失敗：' + err.message);
         console.error(err);
       } finally {
         btn.innerText = '✨ AI 自動帶入';
