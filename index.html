@@ -66,7 +66,7 @@
         </button>
       </div>
 
-      <!-- 表單卡片 (隨主分類換底色) -->
+      <!-- 表單卡片 -->
       <div id="formContainer" class="p-6 rounded-2xl border transition-all duration-300 bg-slate-50 border-slate-200 space-y-6">
         <input type="hidden" id="editingBookId" value="">
 
@@ -124,21 +124,18 @@
           </div>
         </div>
 
-        <!-- 輔助標籤多選區 -->
+        <!-- 輔助標籤多選區（含可刪除按鈕） -->
         <div>
           <label class="block text-xs text-slate-500 font-medium mb-2">次要主題標籤 (可多選)</label>
           <div id="tagContainer" class="flex flex-wrap gap-2 mb-3"></div>
           
-          <div class="p-3 bg-white/80 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-2 items-center">
-            <span class="text-xs text-slate-500 font-medium flex-shrink-0">自訂新標籤：</span>
-            <select id="customTagCategory" class="text-xs p-2 border rounded-lg bg-white">
-            </select>
-            <input type="text" id="customTagInput" placeholder="輸入標籤名稱 (如：#時間管理)..." class="text-xs p-2 border rounded-lg flex-1 w-full md:w-auto">
-            <button onclick="addCustomTag()" type="button" class="text-xs bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg font-medium transition w-full md:w-auto">新增標籤</button>
+          <div class="p-3 bg-white/80 rounded-xl border border-slate-200 flex gap-2 items-center">
+            <input type="text" id="customTagInput" placeholder="自訂新標籤 (如：時間管理)..." class="text-xs p-2 border rounded-lg flex-1">
+            <button onclick="addCustomTag()" type="button" class="text-xs bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium transition flex-shrink-0">新增標籤</button>
           </div>
         </div>
 
-        <!-- 精簡後的閱讀載體與來源 -->
+        <!-- 閱讀載體與來源 -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/70 p-4 rounded-xl border border-slate-200">
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">📱 閱讀載體</label>
@@ -235,15 +232,18 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-2 text-center">🍕 閱讀類型占比（主分類解法 B）</h3>
+          <h3 class="text-sm font-bold text-slate-700 mb-2 text-center">🍕 閱讀類型占比</h3>
           <p class="text-[10px] text-slate-400 text-center mb-3">100% 精準對應實際完讀書本總數</p>
           <canvas id="primaryCategoryChart"></canvas>
         </div>
         
-        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-2 text-center">🏷️ 標籤出現頻率（多選標籤解法 A）</h3>
-          <p class="text-[10px] text-slate-400 text-center mb-3">統計所有書籍標註的熱門細分主題</p>
-          <canvas id="tagsChart"></canvas>
+        <!-- 標籤出現頻率 (排行榜模式) -->
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-700 mb-1 text-center">🏷️ 標籤出現頻率</h3>
+            <p class="text-[10px] text-slate-400 text-center mb-4">依據書籍標註的熱門標籤數量由多到少排列</p>
+            <div id="tagsRankList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
+          </div>
         </div>
 
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -319,10 +319,10 @@
       '其他類型': { color: '#64748b', bgClass: 'bg-slate-50', borderClass: 'border-slate-200' }
     };
 
-    let defaultTags = [
+    let defaultTags = JSON.parse(localStorage.getItem('my_tags') || JSON.stringify([
       '個人成長/習慣', '人際溝通', '情緒整理', '領導管理', '創業',
       '哲學思考', '歷史傳記', '科普', '旅遊/冒險', '藝術/設計'
-    ];
+    ]));
 
     let books = JSON.parse(localStorage.getItem('my_bookshelf') || '[]');
     let selectedTags = new Set();
@@ -330,14 +330,9 @@
 
     function initCategorySelects() {
       const primarySelect = document.getElementById('primaryCategory');
-      const customTagCatSelect = document.getElementById('customTagCategory');
-      
       primarySelect.innerHTML = '';
-      customTagCatSelect.innerHTML = '';
-
       Object.keys(categoryConfig).forEach(cat => {
         primarySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
-        customTagCatSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
       });
     }
 
@@ -612,10 +607,14 @@
       }
     }
 
+    // 渲染標籤區 (具備可點選 + 刪除標籤按鈕)
     function renderTags() {
       const container = document.getElementById('tagContainer');
       container.innerHTML = '';
       defaultTags.forEach(tag => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'inline-flex items-center group relative';
+
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = `tag-btn text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 font-medium ${selectedTags.has(tag) ? 'active' : ''}`;
@@ -625,7 +624,20 @@
           else selectedTags.add(tag);
           renderTags();
         };
-        container.appendChild(btn);
+
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'ml-1 text-[10px] text-slate-400 hover:text-rose-500 font-bold px-1 transition';
+        delBtn.innerText = '✕';
+        delBtn.title = '刪除此標籤';
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteCustomTag(tag);
+        };
+
+        wrapper.appendChild(btn);
+        wrapper.appendChild(delBtn);
+        container.appendChild(wrapper);
       });
     }
 
@@ -635,14 +647,23 @@
       if (val && !defaultTags.includes(val)) {
         defaultTags.push(val);
         selectedTags.add(val);
+        localStorage.setItem('my_tags', JSON.stringify(defaultTags));
         renderTags();
         input.value = '';
       }
     }
 
-    // 閱讀分析圖表繪製
+    function deleteCustomTag(tagToDelete) {
+      if (confirm(`確定要刪除標籤「#${tagToDelete}」嗎？`)) {
+        defaultTags = defaultTags.filter(t => t !== tagToDelete);
+        selectedTags.delete(tagToDelete);
+        localStorage.setItem('my_tags', JSON.stringify(defaultTags));
+        renderTags();
+      }
+    }
+
+    // 閱讀分析圖表與排行榜繪製
     let primaryCatChartInstance = null;
-    let tagsChartInstance = null;
     let ratingChartInstance = null;
     let mediumChartInstance = null;
 
@@ -665,6 +686,7 @@
       const topCat = Object.entries(primaryCatMap).sort((a,b) => b[1] - a[1])[0];
       document.getElementById('stat-top-category').innerText = topCat ? topCat[0] : '-';
 
+      // 1. 閱讀類型占比 (圓餅圖)
       if (primaryCatChartInstance) primaryCatChartInstance.destroy();
       const ctx1 = document.getElementById('primaryCategoryChart').getContext('2d');
       primaryCatChartInstance = new Chart(ctx1, {
@@ -679,20 +701,31 @@
         options: { responsive: true }
       });
 
+      // 2. 標籤出現頻率 (由多到少排行榜清單)
       const tagMap = {};
       books.forEach(b => (b.tags || []).forEach(t => { tagMap[t] = (tagMap[t] || 0) + 1; }));
-      
-      if (tagsChartInstance) tagsChartInstance.destroy();
-      const ctx2 = document.getElementById('tagsChart').getContext('2d');
-      tagsChartInstance = new Chart(ctx2, {
-        type: 'bar',
-        data: {
-          labels: Object.keys(tagMap),
-          datasets: [{ label: '標註次數', data: Object.values(tagMap), backgroundColor: '#8b5cf6', borderRadius: 4 }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      });
+      const sortedTags = Object.entries(tagMap).sort((a, b) => b[1] - a[1]);
 
+      const rankListEl = document.getElementById('tagsRankList');
+      rankListEl.innerHTML = '';
+
+      if (sortedTags.length === 0) {
+        rankListEl.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">尚未新增任何書籍標籤</p>`;
+      } else {
+        sortedTags.forEach(([tag, count], index) => {
+          rankListEl.innerHTML += `
+            <div class="flex items-center justify-between bg-white p-2.5 rounded-lg border border-slate-200 text-xs">
+              <div class="flex items-center gap-2">
+                <span class="w-5 h-5 rounded-full ${index === 0 ? 'bg-amber-400 text-white font-bold' : index === 1 ? 'bg-slate-300 text-slate-700' : index === 2 ? 'bg-amber-600/60 text-white' : 'bg-slate-100 text-slate-500'} flex items-center justify-center text-[10px] font-semibold">${index + 1}</span>
+                <span class="font-medium text-slate-700">#${tag}</span>
+              </div>
+              <span class="font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">${count} 次</span>
+            </div>
+          `;
+        });
+      }
+
+      // 3. 評分分布統計
       const ratingMap = { '5.0⭐': 0, '4.0⭐': 0, '3.0⭐': 0, '2.0⭐': 0, '1.0⭐': 0 };
       books.forEach(b => {
         const r = Math.floor(parseFloat(b.rating || 5)) + '.0⭐';
@@ -710,6 +743,7 @@
         options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
       });
 
+      // 4. 閱讀載體占比圖
       if (mediumChartInstance) mediumChartInstance.destroy();
       const ctx4 = document.getElementById('mediumChart').getContext('2d');
       mediumChartInstance = new Chart(ctx4, {
