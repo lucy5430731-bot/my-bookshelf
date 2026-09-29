@@ -5,25 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>我的個人讀書紀錄</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 引入 圖表庫 Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    .tag-btn.active {
-      background-color: #4f46e5;
-      color: white;
-      border-color: #4f46e5;
-    }
-    .tab-btn.active {
-      border-bottom: 3px solid #4f46e5;
-      color: #4f46e5;
-      font-weight: bold;
-    }
+    .tag-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+    .tab-btn.active { border-bottom: 3px solid #4f46e5; color: #4f46e5; font-weight: bold; }
   </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 md:p-8 font-sans text-slate-800">
   <div class="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-xl">
     
-    <!-- 頂部標題與 Tab 切換列 -->
+    <!-- 頂部 Header & Tabs -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b border-slate-200 gap-4">
       <h1 class="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
         <span>📚</span> 我的個人讀書紀錄
@@ -35,9 +26,8 @@
       </div>
     </div>
 
-    <!-- ================= TAB 1: 我的書櫃 (首頁) ================= -->
+    <!-- ================= TAB 1: 我的書櫃 ================= -->
     <div id="view-shelf" class="space-y-6">
-      <!-- 搜尋與篩選控制列 -->
       <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-4 gap-3">
         <input type="text" id="searchInput" oninput="filterBooks()" placeholder="🔍 搜尋書名、作者、心得..." class="p-2 border rounded-lg text-sm md:col-span-1">
         
@@ -50,7 +40,7 @@
         </select>
 
         <select id="filterCategory" onchange="filterBooks()" class="p-2 border rounded-lg text-sm bg-white">
-          <option value="全部">所有書籍分類</option>
+          <option value="全部">所有主分類</option>
         </select>
 
         <select id="sortBy" onchange="filterBooks()" class="p-2 border rounded-lg text-sm bg-white">
@@ -59,69 +49,72 @@
         </select>
       </div>
 
-      <!-- 書籍卡片牆 -->
-      <div id="bookGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <!-- 書本卡片將由 JS 動態生成 -->
-      </div>
+      <div id="bookGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
     </div>
 
-    <!-- ================= TAB 2: 新增書籍表單 ================= -->
+    <!-- ================= TAB 2: 新增/編輯書籍表單 ================= -->
     <div id="view-add" class="hidden space-y-6">
-      <!-- API Key 設定 -->
       <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
         <label class="block text-sm font-semibold text-amber-900 mb-1">Google AI Studio API Key：</label>
         <input type="password" id="apiKey" placeholder="貼上你的 API Key (AIzaSy...)" class="w-full p-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
       </div>
 
-      <!-- 搜尋與帶入 -->
       <div class="flex gap-2">
-        <input type="text" id="bookSearchInput" placeholder="輸入中文書名或 ISBN 碼 (例如 原子習慣)..." class="flex-1 p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        <input type="text" id="bookSearchInput" placeholder="輸入中文書名或 ISBN 碼..." class="flex-1 p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
         <button onclick="fetchBookInfo()" id="searchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition">
           <span>⚡ 自動帶入資料</span>
         </button>
       </div>
 
-      <!-- 表單內容 -->
-      <div class="space-y-6">
+      <!-- 表單卡片 (隨主分類換底色) -->
+      <div id="formContainer" class="p-6 rounded-2xl border transition-all duration-300 bg-slate-50 border-slate-200 space-y-6">
+        <input type="hidden" id="editingBookId" value="">
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="flex flex-col items-center">
-            <div class="w-36 h-48 bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center text-slate-400 border border-slate-300 mb-3 relative">
+            <div class="w-36 h-48 bg-white rounded-lg overflow-hidden flex items-center justify-center text-slate-400 border border-slate-300 mb-3 relative shadow-sm">
               <img id="coverPreview" src="" class="w-full h-full object-cover hidden">
               <span id="noCoverText" class="text-xs text-center p-2">暫無封面</span>
             </div>
             
             <div class="w-full space-y-2">
-              <label class="block w-full text-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-300 cursor-pointer font-medium transition">
+              <label class="block w-full text-center bg-white hover:bg-slate-100 text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-300 cursor-pointer font-medium transition shadow-sm">
                 📷 選擇上傳圖片
                 <input type="file" id="coverFileInput" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
               </label>
-              <input type="text" id="coverUrl" placeholder="或貼上圖片網址..." class="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+              <input type="text" id="coverUrl" placeholder="或貼上圖片網址..." class="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
             </div>
           </div>
 
           <div class="md:col-span-2 space-y-3">
             <div>
+              <label class="block text-xs font-semibold text-slate-600">主要書籍分類（決定卡片底色與主要數據）*</label>
+              <select id="primaryCategory" onchange="onPrimaryCategoryChange()" class="w-full p-2 border border-indigo-300 rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-indigo-500">
+              </select>
+            </div>
+
+            <div>
               <label class="block text-xs text-slate-500 font-medium">中文書名 *</label>
-              <input type="text" id="titleZh" class="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold">
+              <input type="text" id="titleZh" class="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold bg-white">
             </div>
             <div>
               <label class="block text-xs text-slate-500 font-medium">原文書名 / 副標題</label>
-              <input type="text" id="titleOrig" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
+              <input type="text" id="titleOrig" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white">
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-xs text-slate-500 font-medium">作者</label>
-                <input type="text" id="authors" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
+                <input type="text" id="authors" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white">
               </div>
               <div>
                 <label class="block text-xs text-slate-500 font-medium">出版社</label>
-                <input type="text" id="publisher" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
+                <input type="text" id="publisher" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white">
               </div>
             </div>
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-xs text-slate-500 font-medium">出版日期</label>
-                <input type="text" id="pubDate" placeholder="YYYY-MM-DD" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
+                <input type="text" id="pubDate" placeholder="YYYY-MM-DD" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white">
               </div>
               <div>
                 <label class="block text-xs text-slate-500 font-medium">博客來連結</label>
@@ -131,18 +124,45 @@
           </div>
         </div>
 
+        <!-- 輔助標籤多選區 -->
         <div>
-          <label class="block text-xs text-slate-500 font-medium mb-2">書籍分類（可多選）</label>
-          <div id="categoryContainer" class="flex flex-wrap gap-2 mb-2"></div>
-          <div class="flex gap-2">
-            <input type="text" id="customTagInput" placeholder="新增自訂標籤..." class="text-xs p-2 border rounded-lg flex-1">
-            <button onclick="addCustomTag()" type="button" class="text-xs bg-slate-200 text-slate-700 px-3 py-1 rounded-lg font-medium">新增標籤</button>
+          <label class="block text-xs text-slate-500 font-medium mb-2">次要主題標籤 (可多選)</label>
+          <div id="tagContainer" class="flex flex-wrap gap-2 mb-3"></div>
+          
+          <div class="p-3 bg-white/80 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-2 items-center">
+            <span class="text-xs text-slate-500 font-medium flex-shrink-0">自訂新標籤：</span>
+            <select id="customTagCategory" class="text-xs p-2 border rounded-lg bg-white">
+            </select>
+            <input type="text" id="customTagInput" placeholder="輸入標籤名稱 (如：#時間管理)..." class="text-xs p-2 border rounded-lg flex-1 w-full md:w-auto">
+            <button onclick="addCustomTag()" type="button" class="text-xs bg-slate-700 hover:bg-slate-800 text-white px-3 py-2 rounded-lg font-medium transition w-full md:w-auto">新增標籤</button>
+          </div>
+        </div>
+
+        <!-- 精簡後的閱讀載體與來源 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white/70 p-4 rounded-xl border border-slate-200">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">📱 閱讀載體</label>
+            <select id="medium" class="w-full p-2 border rounded-lg text-sm bg-white">
+              <option value="紙本書">📖 紙本書</option>
+              <option value="電子書">📱 電子書</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">🛒 閱讀來源</label>
+            <select id="source" class="w-full p-2 border rounded-lg text-sm bg-white">
+              <option value="自己購買">💰 自己購買</option>
+              <option value="圖書館借閱">🏛️ 圖書館借閱</option>
+              <option value="朋友借閱">🤝 朋友借閱</option>
+              <option value="電子書訂閱制">♾️ 電子書暢讀訂閱</option>
+              <option value="其他">其他</option>
+            </select>
           </div>
         </div>
 
         <div>
           <label class="block text-xs text-slate-500 font-medium mb-1">書籍簡介</label>
-          <textarea id="summary" rows="3" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-slate-50"></textarea>
+          <textarea id="summary" rows="3" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white"></textarea>
         </div>
 
         <hr class="border-slate-200 my-4">
@@ -177,16 +197,16 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">喜歡的金句 / 佳句摘錄</label>
-          <textarea id="quotes" rows="2" placeholder="輸入喜歡的句子..." class="w-full p-2 border border-slate-300 rounded-lg text-sm"></textarea>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">佳句摘錄</label>
+          <textarea id="quotes" rows="2" placeholder="輸入喜歡的句子..." class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white"></textarea>
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">閱讀心得 / 隨筆</label>
-          <textarea id="notes" rows="3" placeholder="記錄這本書帶給你的想法..." class="w-full p-2 border border-slate-300 rounded-lg text-sm"></textarea>
+          <textarea id="notes" rows="3" placeholder="記錄這本書帶給你的想法..." class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white"></textarea>
         </div>
 
-        <button onclick="saveRecord()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
+        <button onclick="saveRecord()" id="saveBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
           💾 儲存讀書紀錄至書櫃
         </button>
       </div>
@@ -194,49 +214,67 @@
 
     <!-- ================= TAB 3: 閱讀分析數據 ================= -->
     <div id="view-analytics" class="hidden space-y-6">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100">
           <p class="text-xs text-indigo-600 font-bold">2026 完讀總本數</p>
-          <p id="stat-total-2026" class="text-3xl font-extrabold text-indigo-900 mt-1">0 本</p>
+          <p id="stat-total-2026" class="text-2xl md:text-3xl font-extrabold text-indigo-900 mt-1">0 本</p>
         </div>
         <div class="bg-amber-50 p-4 rounded-xl text-center border border-amber-100">
-          <p class="text-xs text-amber-600 font-bold">平均給分</p>
-          <p id="stat-avg-rating" class="text-3xl font-extrabold text-amber-900 mt-1">0.0 ⭐</p>
+          <p class="text-xs text-amber-600 font-bold">平均評分</p>
+          <p id="stat-avg-rating" class="text-2xl md:text-3xl font-extrabold text-amber-900 mt-1">0.0 ⭐</p>
         </div>
         <div class="bg-emerald-50 p-4 rounded-xl text-center border border-emerald-100">
-          <p class="text-xs text-emerald-600 font-bold">最喜歡的類型</p>
-          <p id="stat-top-category" class="text-3xl font-extrabold text-emerald-900 mt-1">-</p>
+          <p class="text-xs text-emerald-600 font-bold">偏好載體</p>
+          <p id="stat-top-medium" class="text-2xl md:text-3xl font-extrabold text-emerald-900 mt-1 truncate">-</p>
+        </div>
+        <div class="bg-purple-50 p-4 rounded-xl text-center border border-purple-100">
+          <p class="text-xs text-purple-600 font-bold">最常閱讀主分類</p>
+          <p id="stat-top-category" class="text-2xl md:text-3xl font-extrabold text-purple-900 mt-1 truncate">-</p>
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">📈 2026 每月完讀數量分布</h3>
-          <canvas id="monthlyChart"></canvas>
+          <h3 class="text-sm font-bold text-slate-700 mb-2 text-center">🍕 閱讀類型占比（主分類解法 B）</h3>
+          <p class="text-[10px] text-slate-400 text-center mb-3">100% 精準對應實際完讀書本總數</p>
+          <canvas id="primaryCategoryChart"></canvas>
         </div>
+        
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">🍕 閱讀書籍類型占比</h3>
-          <canvas id="categoryChart"></canvas>
+          <h3 class="text-sm font-bold text-slate-700 mb-2 text-center">🏷️ 標籤出現頻率（多選標籤解法 A）</h3>
+          <p class="text-[10px] text-slate-400 text-center mb-3">統計所有書籍標註的熱門細分主題</p>
+          <canvas id="tagsChart"></canvas>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">⭐ 評分分布統計</h3>
+          <canvas id="ratingChart"></canvas>
+        </div>
+
+        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-4 text-center">📱 閱讀載體與來源占比</h3>
+          <canvas id="mediumChart"></canvas>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- 單本書籍詳細資料 Modal (彈窗) -->
+  <!-- 單本書籍詳細資料 Modal -->
   <div id="bookModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto relative">
       <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
       
       <div class="flex gap-4">
-        <img id="modalCover" src="" class="w-24 h-32 object-cover rounded-lg border">
+        <img id="modalCover" src="" class="w-24 h-32 object-cover rounded-lg border flex-shrink-0">
         <div>
+          <span id="modalPrimaryCat" class="text-[10px] px-2 py-0.5 rounded-full font-bold mb-1 inline-block"></span>
           <h2 id="modalTitleZh" class="text-lg font-bold text-slate-800"></h2>
           <p id="modalTitleOrig" class="text-xs text-slate-500 mb-2"></p>
           <p class="text-xs text-slate-600">作者：<span id="modalAuthors"></span></p>
-          <p class="text-xs text-slate-600">出版社：<span id="modalPublisher"></span></p>
+          <p class="text-xs text-slate-600">載體 / 來源：<span id="modalMediumSource"></span></p>
           <p class="text-xs text-slate-600">完讀日期：<span id="modalFinishDate"></span></p>
-          <div id="modalRating" class="mt-2 text-amber-500 font-bold text-sm"></div>
+          <div id="modalRating" class="mt-1 text-amber-500 font-bold text-sm"></div>
         </div>
       </div>
 
@@ -248,7 +286,7 @@
       </div>
 
       <div class="bg-amber-50/60 p-3 rounded-lg text-xs border border-amber-200/60 space-y-1">
-        <p class="font-bold text-amber-900">💬 金句摘錄：</p>
+        <p class="font-bold text-amber-900">💬 佳句摘錄：</p>
         <p id="modalQuotes" class="text-amber-800 italic"></p>
       </div>
 
@@ -259,26 +297,57 @@
 
       <a id="modalBooksLink" href="#" target="_blank" class="block text-center text-xs text-indigo-600 underline">前往博客來商品頁</a>
 
-      <button onclick="deleteBook()" class="w-full bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 text-xs py-2 rounded-lg font-medium transition">
-        🗑️ 刪除此書籍紀錄
-      </button>
+      <div class="grid grid-cols-2 gap-2 pt-2">
+        <button onclick="editBook()" class="bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs py-2 rounded-lg font-medium transition">✏️ 編輯書籍資料</button>
+        <button onclick="deleteBook()" class="bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 text-xs py-2 rounded-lg font-medium transition">🗑️ 刪除此紀錄</button>
+      </div>
     </div>
   </div>
 
   <script>
-    // 資料結構初始化
+    const categoryConfig = {
+      '商業思維': { color: '#3b82f6', bgClass: 'bg-blue-50', borderClass: 'border-blue-200' },
+      '市場行銷': { color: '#06b6d4', bgClass: 'bg-cyan-50', borderClass: 'border-cyan-200' },
+      '投資理財': { color: '#10b981', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-200' },
+      '職場工作術': { color: '#6366f1', bgClass: 'bg-indigo-50', borderClass: 'border-indigo-200' },
+      '心理與成長': { color: '#8b5cf6', bgClass: 'bg-purple-50', borderClass: 'border-purple-200' },
+      '中文小說': { color: '#ec4899', bgClass: 'bg-pink-50', borderClass: 'border-pink-200' },
+      '翻譯小說': { color: '#f43f5e', bgClass: 'bg-rose-50', borderClass: 'border-rose-200' },
+      '女性主義': { color: '#d946ef', bgClass: 'bg-fuchsia-50', borderClass: 'border-fuchsia-200' },
+      '人文社會': { color: '#f59e0b', bgClass: 'bg-amber-50', borderClass: 'border-amber-200' },
+      '科技與趨勢': { color: '#0284c7', bgClass: 'bg-sky-50', borderClass: 'border-sky-200' },
+      '其他類型': { color: '#64748b', bgClass: 'bg-slate-50', borderClass: 'border-slate-200' }
+    };
+
+    let defaultTags = [
+      '個人成長/習慣', '人際溝通', '情緒整理', '領導管理', '創業',
+      '哲學思考', '歷史傳記', '科普', '旅遊/冒險', '藝術/設計'
+    ];
+
     let books = JSON.parse(localStorage.getItem('my_bookshelf') || '[]');
+    let selectedTags = new Set();
     let currentModalBookId = null;
 
-    const defaultCategories = [
-      '商業思維', '市場行銷', '投資理財', '職場工作術', '領導管理',
-      '心理學', '個人成長/習慣', '人際溝通', '情緒整理', '哲學思考',
-      '人文歷史', '社會科學', '深度文化', '翻譯小說', '繁體小說',
-      '傳記/自傳', '人工智慧/科技', '科普', '旅遊/冒險', '藝術/設計'
-    ];
-    let selectedCategories = new Set();
+    function initCategorySelects() {
+      const primarySelect = document.getElementById('primaryCategory');
+      const customTagCatSelect = document.getElementById('customTagCategory');
+      
+      primarySelect.innerHTML = '';
+      customTagCatSelect.innerHTML = '';
 
-    // Tab 切換
+      Object.keys(categoryConfig).forEach(cat => {
+        primarySelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+        customTagCatSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
+      });
+    }
+
+    function onPrimaryCategoryChange() {
+      const selected = document.getElementById('primaryCategory').value;
+      const config = categoryConfig[selected] || categoryConfig['其他類型'];
+      const form = document.getElementById('formContainer');
+      form.className = `p-6 rounded-2xl border transition-all duration-300 space-y-6 ${config.bgClass} ${config.borderClass}`;
+    }
+
     function switchTab(tabName) {
       document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');
@@ -291,17 +360,13 @@
 
       if (tabName === 'shelf') renderShelf();
       if (tabName === 'analytics') renderAnalytics();
+      if (tabName === 'add' && !document.getElementById('editingBookId').value) resetForm();
     }
 
-    // 書櫃卡片渲染與篩選
     function renderShelf() {
-      // 動態更新分類篩選下拉選單
       const filterCatSelect = document.getElementById('filterCategory');
-      const allCategories = new Set(defaultCategories);
-      books.forEach(b => (b.categories || []).forEach(c => allCategories.add(c)));
-      
-      filterCatSelect.innerHTML = '<option value="全部">所有書籍分類</option>';
-      allCategories.forEach(cat => {
+      filterCatSelect.innerHTML = '<option value="全部">所有主分類</option>';
+      Object.keys(categoryConfig).forEach(cat => {
         filterCatSelect.innerHTML += `<option value="${cat}">${cat}</option>`;
       });
 
@@ -321,12 +386,11 @@
                               (b.quotes || '').toLowerCase().includes(search);
         
         const matchesStatus = status === '全部' || b.status === status;
-        const matchesCat = category === '全部' || (b.categories || []).includes(category);
+        const matchesCat = category === '全部' || b.primaryCategory === category;
 
         return matchesSearch && matchesStatus && matchesCat;
       });
 
-      // 排序
       filtered.sort((a, b) => {
         if (sortBy === 'finishDateDesc') return new Date(b.finishDate || 0) - new Date(a.finishDate || 0);
         if (sortBy === 'ratingDesc') return parseFloat(b.rating || 0) - parseFloat(a.rating || 0);
@@ -341,24 +405,26 @@
       }
 
       filtered.forEach(book => {
+        const config = categoryConfig[book.primaryCategory] || categoryConfig['其他類型'];
         const card = document.createElement('div');
-        card.className = "bg-white border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer flex flex-col";
+        card.className = `border rounded-xl overflow-hidden shadow-sm hover:shadow-md transition cursor-pointer flex flex-col ${config.bgClass} ${config.borderClass}`;
         card.onclick = () => openModal(book.id);
 
         const coverSrc = book.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover';
         const stars = '⭐'.repeat(Math.floor(parseFloat(book.rating || 0)));
 
         card.innerHTML = `
-          <div class="h-44 bg-slate-100 overflow-hidden relative">
+          <div class="h-44 bg-slate-200 overflow-hidden relative">
             <img src="${coverSrc}" class="w-full h-full object-cover">
             <span class="absolute top-2 right-2 text-[10px] bg-slate-800/80 text-white px-2 py-0.5 rounded-full">${book.status || '已完讀'}</span>
+            <span class="absolute bottom-2 left-2 text-[9px] font-bold text-white bg-indigo-600/90 px-1.5 py-0.5 rounded">${book.primaryCategory || '通用'}</span>
           </div>
           <div class="p-3 flex-1 flex flex-col justify-between space-y-1">
             <div>
               <h3 class="font-bold text-xs line-clamp-1 text-slate-800">${book.titleZh}</h3>
               <p class="text-[10px] text-slate-500 line-clamp-1">${book.authors || '未知作者'}</p>
             </div>
-            <div class="pt-2 border-t flex justify-between items-center text-[10px] text-slate-400">
+            <div class="pt-2 border-t border-slate-200/60 flex justify-between items-center text-[10px] text-slate-500">
               <span>${stars || '無評分'}</span>
               <span>${book.finishDate || ''}</span>
             </div>
@@ -368,21 +434,21 @@
       });
     }
 
-    // Modal 彈窗控制
     function openModal(id) {
       const book = books.find(b => b.id === id);
       if (!book) return;
 
       currentModalBookId = id;
       document.getElementById('modalCover').src = book.coverUrl || 'https://via.placeholder.com/150x200?text=No+Cover';
+      document.getElementById('modalPrimaryCat').innerText = book.primaryCategory || '未分類';
       document.getElementById('modalTitleZh').innerText = book.titleZh;
       document.getElementById('modalTitleOrig').innerText = book.titleOrig || '';
       document.getElementById('modalAuthors').innerText = book.authors || '無';
-      document.getElementById('modalPublisher').innerText = book.publisher || '無';
+      document.getElementById('modalMediumSource').innerText = `${book.medium || '紙本書'} (${book.source || '購買'})`;
       document.getElementById('modalFinishDate').innerText = book.finishDate || '未紀錄';
       document.getElementById('modalRating').innerText = `⭐ ${book.rating} / 5.0`;
       document.getElementById('modalSummary').innerText = book.summary || '無簡介';
-      document.getElementById('modalQuotes').innerText = book.quotes || '尚無紀錄金句';
+      document.getElementById('modalQuotes').innerText = book.quotes || '尚無紀錄佳句';
       document.getElementById('modalNotes').innerText = book.notes || '尚無紀錄心得';
       
       const linkEl = document.getElementById('modalBooksLink');
@@ -390,8 +456,8 @@
 
       const catEl = document.getElementById('modalCategories');
       catEl.innerHTML = '';
-      (book.categories || []).forEach(c => {
-        catEl.innerHTML += `<span class="bg-indigo-50 text-indigo-600 text-[10px] px-2 py-0.5 rounded-md font-medium">${c}</span>`;
+      (book.tags || []).forEach(c => {
+        catEl.innerHTML += `<span class="bg-indigo-50 text-indigo-600 text-[10px] px-2 py-0.5 rounded-md font-medium border border-indigo-100">#${c}</span>`;
       });
 
       document.getElementById('bookModal').classList.remove('hidden');
@@ -399,6 +465,40 @@
 
     function closeModal() {
       document.getElementById('bookModal').classList.add('hidden');
+    }
+
+    function editBook() {
+      const book = books.find(b => b.id === currentModalBookId);
+      if (!book) return;
+
+      closeModal();
+      document.getElementById('editingBookId').value = book.id;
+      document.getElementById('primaryCategory').value = book.primaryCategory || '商業思維';
+      onPrimaryCategoryChange();
+
+      document.getElementById('titleZh').value = book.titleZh || '';
+      document.getElementById('titleOrig').value = book.titleOrig || '';
+      document.getElementById('authors').value = book.authors || '';
+      document.getElementById('publisher').value = book.publisher || '';
+      document.getElementById('pubDate').value = book.pubDate || '';
+      document.getElementById('summary').value = book.summary || '';
+      document.getElementById('coverUrl').value = book.coverUrl || '';
+      updateCoverPreview(book.coverUrl || '');
+      
+      document.getElementById('medium').value = book.medium || '紙本書';
+      document.getElementById('source').value = book.source || '自己購買';
+
+      selectedTags = new Set(book.tags || []);
+      renderTags();
+
+      document.getElementById('status').value = book.status || '已完讀';
+      document.getElementById('finishDate').value = book.finishDate || '';
+      document.getElementById('rating').value = book.rating || '5.0';
+      document.getElementById('quotes').value = book.quotes || '';
+      document.getElementById('notes').value = book.notes || '';
+
+      document.getElementById('saveBtn').innerText = '💾 更新書籍紀錄';
+      switchTab('add');
     }
 
     function deleteBook() {
@@ -410,22 +510,26 @@
       }
     }
 
-    // 儲存新書籍
     function saveRecord() {
       const titleZh = document.getElementById('titleZh').value.trim();
       if (!titleZh) return alert('請填寫中文書名！');
 
-      const newBook = {
-        id: Date.now().toString(),
+      const editingId = document.getElementById('editingBookId').value;
+
+      const bookData = {
+        id: editingId || Date.now().toString(),
+        primaryCategory: document.getElementById('primaryCategory').value,
         titleZh: titleZh,
         titleOrig: document.getElementById('titleOrig').value,
         authors: document.getElementById('authors').value,
         publisher: document.getElementById('publisher').value,
         pubDate: document.getElementById('pubDate').value,
+        medium: document.getElementById('medium').value,
+        source: document.getElementById('source').value,
         summary: document.getElementById('summary').value,
         coverUrl: document.getElementById('coverUrl').value,
         booksLink: document.getElementById('booksLink').href,
-        categories: Array.from(selectedCategories),
+        tags: Array.from(selectedTags),
         status: document.getElementById('status').value,
         finishDate: document.getElementById('finishDate').value,
         rating: document.getElementById('rating').value,
@@ -433,253 +537,39 @@
         notes: document.getElementById('notes').value
       };
 
-      books.unshift(newBook);
-      localStorage.setItem('my_bookshelf', JSON.stringify(books));
+      if (editingId) {
+        const idx = books.findIndex(b => b.id === editingId);
+        if (idx !== -1) books[idx] = bookData;
+      } else {
+        books.unshift(bookData);
+      }
 
-      alert('🎉 成功儲存紀錄！');
+      localStorage.setItem('my_bookshelf', JSON.stringify(books));
+      alert(editingId ? '🎉 紀錄更新成功！' : '🎉 成功新增書籍！');
+      resetForm();
       switchTab('shelf');
     }
 
-    // 分類標籤渲染
-    function renderCategories() {
-      const container = document.getElementById('categoryContainer');
-      container.innerHTML = '';
-      defaultCategories.forEach(cat => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `tag-btn text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 font-medium ${selectedCategories.has(cat) ? 'active' : ''}`;
-        btn.innerText = cat;
-        btn.onclick = () => {
-          if (selectedCategories.has(cat)) selectedCategories.delete(cat);
-          else selectedCategories.add(cat);
-          renderCategories();
-        };
-        container.appendChild(btn);
-      });
-    }
-
-    function addCustomTag() {
-      const input = document.getElementById('customTagInput');
-      const val = input.value.trim();
-      if (val && !defaultCategories.includes(val)) {
-        defaultCategories.push(val);
-        selectedCategories.add(val);
-        renderCategories();
-        input.value = '';
-      }
-    }
-
-    // 閱讀分析圖表渲染 (Chart.js)
-    let monthlyChartInstance = null;
-    let categoryChartInstance = null;
-
-    function renderAnalytics() {
-      const year2026Books = books.filter(b => (b.finishDate || '').startsWith('2026') && b.status === '已完讀');
-      
-      document.getElementById('stat-total-2026').innerText = `${year2026Books.length} 本`;
-
-      // 平均給分
-      if (books.length > 0) {
-        const avg = (books.reduce((acc, b) => acc + parseFloat(b.rating || 0), 0) / books.length).toFixed(1);
-        document.getElementById('stat-avg-rating').innerText = `${avg} ⭐`;
-      }
-
-      // 每月分布資料 (2026)
-      const monthCounts = Array(12).fill(0);
-      year2026Books.forEach(b => {
-        const m = parseInt(b.finishDate.split('-')[1]) - 1;
-        if (m >= 0 && m < 12) monthCounts[m]++;
-      });
-
-      // 類型分布資料
-      const catMap = {};
-      books.forEach(b => {
-        (b.categories || []).forEach(c => {
-          catMap[c] = (catMap[c] || 0) + 1;
-        });
-      });
-
-      const topCat = Object.entries(catMap).sort((a,b) => b[1] - a[1])[0];
-      document.getElementById('stat-top-category').innerText = topCat ? topCat[0] : '-';
-
-      // 繪製月份圖表
-      if (monthlyChartInstance) monthlyChartInstance.destroy();
-      const ctx1 = document.getElementById('monthlyChart').getContext('2d');
-      monthlyChartInstance = new Chart(ctx1, {
-        type: 'bar',
-        data: {
-          labels: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
-          datasets: [{
-            label: '完讀本數',
-            data: monthCounts,
-            backgroundColor: '#6366f1',
-            borderRadius: 6
-          }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-      });
-
-      // 繪製圓餅圖
-      if (categoryChartInstance) categoryChartInstance.destroy();
-      const ctx2 = document.getElementById('categoryChart').getContext('2d');
-      categoryChartInstance = new Chart(ctx2, {
-        type: 'doughnut',
-        data: {
-          labels: Object.keys(catMap),
-          datasets: [{
-            data: Object.values(catMap),
-            backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6']
-          }]
-        },
-        options: { responsive: true }
-      });
-    }
-
-    // 初始化自動帶入與封面上傳
-    renderCategories();
-    document.getElementById('finishDate').valueAsDate = new Date();
-    const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) document.getElementById('apiKey').value = savedKey;
-
-    document.getElementById('apiKey').addEventListener('change', (e) => {
-      localStorage.setItem('gemini_api_key', e.target.value.trim());
-    });
-
-    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-    async function fetchBookInfo() {
-      const query = document.getElementById('bookSearchInput').value.trim();
-      const apiKey = document.getElementById('apiKey').value.trim();
-      if (!query) return alert('請輸入中文書名或 ISBN！');
-
-      const btn = document.getElementById('searchBtn');
-      btn.innerText = '⚡ 正在檢索圖書庫...';
-      btn.disabled = true;
-
-      const cleanQuery = query.replace(/[- ]/g, '');
-
-      try {
-        const searchTerms = [`isbn:${cleanQuery}`, `intitle:${query}`, query];
-        let gbItem = null;
-
-        for (const term of searchTerms) {
-          try {
-            let res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(term)}&maxResults=1`);
-            let data = await res.json();
-            if (data.items && data.items.length > 0) {
-              gbItem = data.items[0];
-              break;
-            }
-          } catch(e){}
-        }
-
-        if (gbItem) {
-          const info = gbItem.volumeInfo;
-          document.getElementById('titleZh').value = info.title || '';
-          document.getElementById('titleOrig').value = info.subtitle || '';
-          document.getElementById('authors').value = (info.authors || []).join(', ');
-          document.getElementById('publisher').value = info.publisher || '';
-          document.getElementById('pubDate').value = info.publishedDate || '';
-          document.getElementById('summary').value = info.description || '（無簡介，可手動填寫）';
-
-          if (info.categories) {
-            info.categories.forEach(c => {
-              defaultCategories.forEach(dc => {
-                if (c.includes(dc) || dc.includes(c)) selectedCategories.add(dc);
-              });
-            });
-            renderCategories();
-          }
-
-          const searchKey = encodeURIComponent(query);
-          const linkEl = document.getElementById('booksLink');
-          linkEl.href = `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
-          linkEl.innerText = '點此前往博客來搜尋頁面';
-
-          if (info.imageLinks && info.imageLinks.thumbnail) {
-            const httpsCover = info.imageLinks.thumbnail.replace('http://', 'https://');
-            document.getElementById('coverUrl').value = httpsCover;
-            updateCoverPreview(httpsCover);
-          }
-
-          btn.innerText = '⚡ 自動帶入資料';
-          btn.disabled = false;
-          return;
-        }
-
-        if (apiKey) {
-          btn.innerText = '🔍 圖書館未找到，AI 檢索中...';
-          await fetchFromGeminiWithRetry(query, apiKey);
-        } else {
-          alert('圖書館資料庫中暫無此書籍，可手動填寫或輸入 API Key 開啟 AI 檢索。');
-        }
-
-      } catch (err) {
-        if (apiKey) await fetchFromGeminiWithRetry(query, apiKey);
-      } finally {
-        btn.innerText = '⚡ 自動帶入資料';
-        btn.disabled = false;
-      }
-    }
-
-    async function fetchFromGeminiWithRetry(query, apiKey) {
-      const btn = document.getElementById('searchBtn');
-      const systemPrompt = "你是一個圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。books_link 請輸出博客來最新搜尋格式：https://search.books.com.tw/search/query/key/【ISBN或關鍵字】/cat/all";
-      const jsonSchema = {
-        type: "OBJECT",
-        properties: {
-          book_title_zh: { type: "STRING" },
-          book_title_original: { type: "STRING" },
-          authors: { type: "ARRAY", items: { type: "STRING" } },
-          publisher: { type: "STRING" },
-          publication_date: { type: "STRING" },
-          categories: { type: "ARRAY", items: { type: "STRING" } },
-          summary: { type: "STRING" },
-          books_link: { type: "STRING" }
-        },
-        required: ["book_title_zh", "authors", "publisher", "summary", "books_link"]
-      };
-
-      const modelName = 'gemini-3.8-flash';
-
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `請檢索這本書的完整資料：${query}` }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
-          })
-        });
-
-        const result = await response.json();
-        if (result.error) throw new Error(result.error.message);
-
-        const bookData = JSON.parse(result.candidates[0].content.parts[0].text);
-        document.getElementById('titleZh').value = bookData.book_title_zh || '';
-        document.getElementById('titleOrig').value = bookData.book_title_original || '';
-        document.getElementById('authors').value = (bookData.authors || []).join(', ');
-        document.getElementById('publisher').value = bookData.publisher || '';
-        document.getElementById('pubDate').value = bookData.publication_date || '';
-        document.getElementById('summary').value = bookData.summary || '';
-        
-        if (bookData.categories) {
-          bookData.categories.forEach(c => {
-            if (!defaultCategories.includes(c)) defaultCategories.push(c);
-            selectedCategories.add(c);
-          });
-          renderCategories();
-        }
-
-        const linkEl = document.getElementById('booksLink');
-        const searchKey = encodeURIComponent(query);
-        linkEl.href = bookData.books_link || `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
-        linkEl.innerText = '點此前往博客來搜尋頁面';
-
-      } catch (e) {
-        alert('AI 檢索失敗：' + e.message);
-      }
+    function resetForm() {
+      document.getElementById('editingBookId').value = '';
+      document.getElementById('primaryCategory').value = '商業思維';
+      onPrimaryCategoryChange();
+      document.getElementById('titleZh').value = '';
+      document.getElementById('titleOrig').value = '';
+      document.getElementById('authors').value = '';
+      document.getElementById('publisher').value = '';
+      document.getElementById('pubDate').value = '';
+      document.getElementById('summary').value = '';
+      document.getElementById('coverUrl').value = '';
+      updateCoverPreview('');
+      selectedTags.clear();
+      renderTags();
+      document.getElementById('status').value = '已完讀';
+      document.getElementById('finishDate').valueAsDate = new Date();
+      document.getElementById('rating').value = '5.0';
+      document.getElementById('quotes').value = '';
+      document.getElementById('notes').value = '';
+      document.getElementById('saveBtn').innerText = '💾 儲存讀書紀錄至書櫃';
     }
 
     function handleFileUpload(event) {
@@ -687,8 +577,20 @@
       if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-          updateCoverPreview(e.target.result);
-          document.getElementById('coverUrl').value = '';
+          const img = new Image();
+          img.onload = function() {
+            const canvas = document.createElement('canvas');
+            const maxW = 300;
+            const scale = maxW / img.width;
+            canvas.width = maxW;
+            canvas.height = img.height * scale;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressedUrl = canvas.toDataURL('image/jpeg', 0.7);
+            document.getElementById('coverUrl').value = compressedUrl;
+            updateCoverPreview(compressedUrl);
+          };
+          img.src = e.target.result;
         };
         reader.readAsDataURL(file);
       }
@@ -710,7 +612,118 @@
       }
     }
 
-    // 預設啟動書櫃渲染
+    function renderTags() {
+      const container = document.getElementById('tagContainer');
+      container.innerHTML = '';
+      defaultTags.forEach(tag => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `tag-btn text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 font-medium ${selectedTags.has(tag) ? 'active' : ''}`;
+        btn.innerText = `#${tag}`;
+        btn.onclick = () => {
+          if (selectedTags.has(tag)) selectedTags.delete(tag);
+          else selectedTags.add(tag);
+          renderTags();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    function addCustomTag() {
+      const input = document.getElementById('customTagInput');
+      const val = input.value.trim().replace(/^#/, '');
+      if (val && !defaultTags.includes(val)) {
+        defaultTags.push(val);
+        selectedTags.add(val);
+        renderTags();
+        input.value = '';
+      }
+    }
+
+    // 閱讀分析圖表繪製
+    let primaryCatChartInstance = null;
+    let tagsChartInstance = null;
+    let ratingChartInstance = null;
+    let mediumChartInstance = null;
+
+    function renderAnalytics() {
+      const year2026Books = books.filter(b => (b.finishDate || '').startsWith('2026') && b.status === '已完讀');
+      document.getElementById('stat-total-2026').innerText = `${year2026Books.length} 本`;
+
+      if (books.length > 0) {
+        const avg = (books.reduce((acc, b) => acc + parseFloat(b.rating || 0), 0) / books.length).toFixed(1);
+        document.getElementById('stat-avg-rating').innerText = `${avg} ⭐`;
+      }
+
+      const mediumMap = {};
+      books.forEach(b => { mediumMap[b.medium || '紙本書'] = (mediumMap[b.medium || '紙本書'] || 0) + 1; });
+      const topMedium = Object.entries(mediumMap).sort((a,b) => b[1] - a[1])[0];
+      document.getElementById('stat-top-medium').innerText = topMedium ? topMedium[0] : '-';
+
+      const primaryCatMap = {};
+      books.forEach(b => { primaryCatMap[b.primaryCategory || '商業思維'] = (primaryCatMap[b.primaryCategory || '商業思維'] || 0) + 1; });
+      const topCat = Object.entries(primaryCatMap).sort((a,b) => b[1] - a[1])[0];
+      document.getElementById('stat-top-category').innerText = topCat ? topCat[0] : '-';
+
+      if (primaryCatChartInstance) primaryCatChartInstance.destroy();
+      const ctx1 = document.getElementById('primaryCategoryChart').getContext('2d');
+      primaryCatChartInstance = new Chart(ctx1, {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(primaryCatMap),
+          datasets: [{
+            data: Object.values(primaryCatMap),
+            backgroundColor: Object.keys(primaryCatMap).map(cat => (categoryConfig[cat] || categoryConfig['其他類型']).color)
+          }]
+        },
+        options: { responsive: true }
+      });
+
+      const tagMap = {};
+      books.forEach(b => (b.tags || []).forEach(t => { tagMap[t] = (tagMap[t] || 0) + 1; }));
+      
+      if (tagsChartInstance) tagsChartInstance.destroy();
+      const ctx2 = document.getElementById('tagsChart').getContext('2d');
+      tagsChartInstance = new Chart(ctx2, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(tagMap),
+          datasets: [{ label: '標註次數', data: Object.values(tagMap), backgroundColor: '#8b5cf6', borderRadius: 4 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      const ratingMap = { '5.0⭐': 0, '4.0⭐': 0, '3.0⭐': 0, '2.0⭐': 0, '1.0⭐': 0 };
+      books.forEach(b => {
+        const r = Math.floor(parseFloat(b.rating || 5)) + '.0⭐';
+        if (ratingMap[r] !== undefined) ratingMap[r]++;
+      });
+
+      if (ratingChartInstance) ratingChartInstance.destroy();
+      const ctx3 = document.getElementById('ratingChart').getContext('2d');
+      ratingChartInstance = new Chart(ctx3, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(ratingMap),
+          datasets: [{ label: '本數', data: Object.values(ratingMap), backgroundColor: '#f59e0b', borderRadius: 4 }]
+        },
+        options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
+      });
+
+      if (mediumChartInstance) mediumChartInstance.destroy();
+      const ctx4 = document.getElementById('mediumChart').getContext('2d');
+      mediumChartInstance = new Chart(ctx4, {
+        type: 'pie',
+        data: {
+          labels: Object.keys(mediumMap),
+          datasets: [{ data: Object.values(mediumMap), backgroundColor: ['#10b981', '#6366f1', '#64748b'] }]
+        },
+        options: { responsive: true }
+      });
+    }
+
+    initCategorySelects();
+    renderTags();
     renderShelf();
   </script>
 </body>
