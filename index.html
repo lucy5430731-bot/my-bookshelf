@@ -142,7 +142,6 @@
       localStorage.setItem('gemini_api_key', e.target.value.trim());
     });
 
-    // 輔助函式：延遲毫秒
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     async function fetchBookInfo() {
@@ -172,13 +171,12 @@
         required: ["book_title_zh", "authors", "publisher", "summary", "books_link"]
       };
 
-      // 嚴選當前有效的官方主力模型與備援模型
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
+      // 純粹使用穩定的 Flash 系列模型組合
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash'];
       let data = null;
       let lastError = null;
 
       for (const modelName of modelsToTry) {
-        // 每個模型最多重試 2 次（應付 503 瞬間流量）
         for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             if (attempt > 1) {
@@ -203,21 +201,21 @@
 
             if (!result.error) {
               data = result;
-              break; // 成功取得資料，跳出重試與備援迴圈
+              break;
             } else {
               lastError = result.error;
-              // 如果不是 503 忙碌，就不重複嘗試該模型，直接換下一個模型
+              // 只有 503 伺服器忙碌才重試，其餘錯誤直接換模型
               if (result.error.code !== 503) break;
             }
           } catch (e) {
             lastError = e;
           }
         }
-        if (data) break; // 已成功取得，跳出模型切換迴圈
+        if (data) break;
       }
 
       if (!data) {
-        alert(`Google API 呼叫失敗：${lastError?.message || '伺服器忙碌中'}，請稍微等候幾秒再試一次。`);
+        alert(`Google API 呼叫失敗：${lastError?.message || '伺服器忙碌中'}，請稍後再試。`);
         btn.innerText = '✨ AI 自動帶入';
         btn.disabled = false;
         return;
