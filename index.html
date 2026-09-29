@@ -12,9 +12,9 @@
     
     <!-- API Key 設定 -->
     <div class="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-      <label class="block text-sm font-semibold text-amber-900 mb-1">Google AI Studio API Key (備用 AI 補充)：</label>
+      <label class="block text-sm font-semibold text-amber-900 mb-1">Google AI Studio API Key (AI 備用搜尋)：</label>
       <input type="password" id="apiKey" placeholder="貼上你的 API Key (AIzaSy...)" class="w-full p-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-      <p class="text-xs text-amber-700 mt-1">※ 系統會優先使用免費 Google Books API，速度超快且不塞車！</p>
+      <p class="text-xs text-amber-700 mt-1">※ 系統會優先使用極速 Google Books API，若找不到會自動切換至 Gemini AI 檢索。</p>
     </div>
 
     <!-- 搜尋與帶入 -->
@@ -51,7 +51,7 @@
             <input type="text" id="titleZh" class="w-full p-2 border border-slate-300 rounded-lg text-sm font-bold">
           </div>
           <div>
-            <label class="block text-xs text-slate-500 font-medium">原文書名 / 英文書名</label>
+            <label class="block text-xs text-slate-500 font-medium">原文書名 / 副標題</label>
             <input type="text" id="titleOrig" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
           </div>
           <div class="grid grid-cols-2 gap-2">
@@ -152,13 +152,33 @@
       btn.innerText = '⚡ 正在檢索圖書庫...';
       btn.disabled = true;
 
-      try {
-        // 第一線：呼叫免費公開的 Google Books API (無需 API Key，秒速回傳)
-        const gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`);
-        const gbData = await gbRes.json();
+      const cleanQuery = query.replace(/[- ]/g, '');
+      const isIsbn = /^\d{10,13}$/i.test(cleanQuery);
 
-        if (gbData.items && gbData.items.length > 0) {
-          const info = gbData.items[0].volumeInfo;
+      try {
+        let gbItem = null;
+
+        // 1. 若為 ISBN，先使用 isbn: 精準前綴查詢
+        if (isIsbn) {
+          let gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${cleanQuery}&maxResults=1`);
+          let gbData = await gbRes.json();
+          if (gbData.items && gbData.items.length > 0) {
+            gbItem = gbData.items[0];
+          }
+        }
+
+        // 2. 若 ISBN 未命中或輸入為書名，進行全文模糊查詢
+        if (!gbItem) {
+          let gbRes = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=1`);
+          let gbData = await gbRes.json();
+          if (gbData.items && gbData.items.length > 0) {
+            gbItem = gbData.items[0];
+          }
+        }
+
+        // 在 Google Books API 成功找到書籍
+        if (gbItem) {
+          const info = gbItem.volumeInfo;
 
           document.getElementById('titleZh').value = info.title || '';
           document.getElementById('titleOrig').value = info.subtitle || '';
@@ -167,13 +187,11 @@
           document.getElementById('pubDate').value = `${info.publishedDate || ''} / ${(info.categories || []).join(', ')}`;
           document.getElementById('summary').value = info.description || '（無簡介，可手動填寫）';
 
-          // 產生博客來搜尋網址
           const searchKey = encodeURIComponent(query);
           const linkEl = document.getElementById('booksLink');
           linkEl.href = `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
           linkEl.innerText = '點此前往博客來搜尋頁面';
 
-          // 若 Google Books 有提供封面且目前沒設定，可自動補上
           if (info.imageLinks && info.imageLinks.thumbnail) {
             const httpsCover = info.imageLinks.thumbnail.replace('http://', 'https://');
             document.getElementById('coverUrl').value = httpsCover;
@@ -182,15 +200,15 @@
 
           btn.innerText = '⚡ 極速自動帶入';
           btn.disabled = false;
-          return; // 第一線成功直接結束，秒速搞定！
+          return;
         }
 
-        // 第二線：若 Google Books API 找不到資料，且使用者有填寫 Gemini Key，才備用呼叫 AI
+        // 3. 圖書館 API 查無資料，無縫切換 Gemini AI
         if (apiKey) {
-          btn.innerText = '🔍 圖書館未找到，切換 AI 檢索中...';
+          btn.innerText = '🔍 圖書館未找到，切換 AI 強力檢索中...';
           await fetchFromGemini(query, apiKey);
         } else {
-          alert('在公開圖書庫中未找到該書籍，建議填寫 Gemini API Key 以開啟 AI 強力搜尋。');
+          alert('公開圖書庫中未找到該書籍，請先填寫頂部的 Google AI Studio API Key，即可開啟 AI 幫你檢索！');
         }
 
       } catch (err) {
@@ -198,7 +216,7 @@
         if (apiKey) {
           await fetchFromGemini(query, apiKey);
         } else {
-          alert('搜尋失敗，請檢查網路連線或輸入正確書名/ISBN。');
+          alert('搜尋失敗，請確認網路連線或 API Key 是否正確。');
         }
       } finally {
         btn.innerText = '⚡ 極速自動帶入';
