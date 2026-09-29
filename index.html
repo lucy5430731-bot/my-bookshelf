@@ -59,6 +59,20 @@
 
     <!-- TAB 2: 新增/編輯書籍表單 -->
     <div id="view-add" class="hidden space-y-6">
+      <!-- API Key 設定與自動檢索區 -->
+      <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-amber-900 mb-1">Google AI Studio API Key (AI 輔助尋書備用)：</label>
+          <input type="password" id="apiKey" placeholder="貼上你的 API Key (AIzaSy...)" class="w-full p-2 border border-amber-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+        </div>
+        <div class="flex gap-2">
+          <input type="text" id="bookSearchInput" placeholder="輸入中文書名或 ISBN 碼 (例如 原子習慣)..." class="flex-1 p-2.5 border border-amber-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+          <button onclick="fetchBookInfo()" id="searchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-5 py-2.5 rounded-xl text-xs transition flex-shrink-0">
+            ⚡ 自動帶入資料
+          </button>
+        </div>
+      </div>
+
       <div id="formContainer" class="p-6 rounded-2xl border transition-all duration-300 bg-slate-50 border-slate-200 space-y-6">
         <input type="hidden" id="editingBookId" value="">
 
@@ -110,7 +124,7 @@
               </div>
               <div>
                 <label class="block text-xs text-slate-500 font-medium">博客來連結</label>
-                <input type="text" id="booksLink" placeholder="https://..." class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white">
+                <a id="booksLink" href="#" target="_blank" class="text-xs text-indigo-600 underline block mt-2 truncate">尚未產生</a>
               </div>
             </div>
           </div>
@@ -141,7 +155,7 @@
               <option value="自己購買">💰 自己購買</option>
               <option value="圖書館借閱">🏛️ 圖書館借閱</option>
               <option value="朋友借閱">🤝 朋友借閱</option>
-              <option value="電子書訂閱制">♾️ 電子書暢讀訂閱</option>
+              <option value="電子書訂閱制">♾️️ 電子書暢讀訂閱</option>
               <option value="其他">其他</option>
             </select>
           </div>
@@ -294,7 +308,6 @@
   </div>
 
   <script>
-    // 已自動帶入你的專屬 Supabase 資訊
     const SUPABASE_URL = 'https://iuvzixotdxlpdzvhbgph.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dnppeG90ZHhscGR6dmhiZ3BoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2OTQ5MDMsImV4cCI6MjEwNjI3MDkwM30.ezI8Y24n1qbywbo-19e9N7e6FUUsXgsCpjk3hNLRNAQ';
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -320,6 +333,133 @@
     let books = [];
     let selectedTags = new Set();
     let currentModalBookId = null;
+
+    // 記憶 API Key
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) document.getElementById('apiKey').value = savedKey;
+    document.getElementById('apiKey').addEventListener('change', (e) => {
+      localStorage.setItem('gemini_api_key', e.target.value.trim());
+    });
+
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+    // ⚡ 自動帶入書籍資料 (Google Books API + Gemini API 備用)
+    async function fetchBookInfo() {
+      const query = document.getElementById('bookSearchInput').value.trim();
+      const apiKey = document.getElementById('apiKey').value.trim();
+      if (!query) return alert('請輸入中文書名或 ISBN！');
+
+      const btn = document.getElementById('searchBtn');
+      btn.innerText = '⚡ 檢索中...';
+      btn.disabled = true;
+
+      const cleanQuery = query.replace(/[- ]/g, '');
+
+      try {
+        const searchTerms = [`isbn:${cleanQuery}`, `intitle:${query}`, query];
+        let gbItem = null;
+
+        for (const term of searchTerms) {
+          try {
+            let res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(term)}&maxResults=1`);
+            let data = await res.json();
+            if (data.items && data.items.length > 0) {
+              gbItem = data.items[0];
+              break;
+            }
+          } catch(e){}
+        }
+
+        if (gbItem) {
+          const info = gbItem.volumeInfo;
+          document.getElementById('titleZh').value = info.title || '';
+          document.getElementById('titleOrig').value = info.subtitle || '';
+          document.getElementById('authors').value = (info.authors || []).join(', ');
+          document.getElementById('publisher').value = info.publisher || '';
+          document.getElementById('pubDate').value = info.publishedDate || '';
+          document.getElementById('summary').value = info.description || '';
+
+          const searchKey = encodeURIComponent(query);
+          const linkEl = document.getElementById('booksLink');
+          linkEl.href = `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
+          linkEl.innerText = '點此前往博客來頁面';
+
+          if (info.imageLinks && info.imageLinks.thumbnail) {
+            const httpsCover = info.imageLinks.thumbnail.replace('http://', 'https://');
+            document.getElementById('coverUrl').value = httpsCover;
+            updateCoverPreview(httpsCover);
+          }
+
+          btn.innerText = '⚡ 自動帶入資料';
+          btn.disabled = false;
+          return;
+        }
+
+        if (apiKey) {
+          btn.innerText = '🔍 AI 檢索中...';
+          await fetchFromGeminiWithRetry(query, apiKey);
+        } else {
+          alert('圖書館中無此書籍，可輸入 API Key 開啟 AI 輔助帶入。');
+        }
+
+      } catch (err) {
+        if (apiKey) await fetchFromGeminiWithRetry(query, apiKey);
+      } finally {
+        btn.innerText = '⚡ 自動帶入資料';
+        btn.disabled = false;
+      }
+    }
+
+    async function fetchFromGeminiWithRetry(query, apiKey) {
+      const btn = document.getElementById('searchBtn');
+      const systemPrompt = "你是一個圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。books_link 請輸出博客來最新搜尋格式：https://search.books.com.tw/search/query/key/【ISBN或關鍵字】/cat/all";
+      const jsonSchema = {
+        type: "OBJECT",
+        properties: {
+          book_title_zh: { type: "STRING" },
+          book_title_original: { type: "STRING" },
+          authors: { type: "ARRAY", items: { type: "STRING" } },
+          publisher: { type: "STRING" },
+          publication_date: { type: "STRING" },
+          summary: { type: "STRING" },
+          books_link: { type: "STRING" }
+        },
+        required: ["book_title_zh", "authors", "publisher", "summary", "books_link"]
+      };
+
+      const modelName = 'gemini-3.8-flash';
+
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `請檢索這本書的完整資料：${query}` }] }],
+            systemInstruction: { parts: [{ text: systemPrompt }] },
+            generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
+          })
+        });
+
+        const result = await response.json();
+        if (result.error) throw new Error(result.error.message);
+
+        const bookData = JSON.parse(result.candidates[0].content.parts[0].text);
+        document.getElementById('titleZh').value = bookData.book_title_zh || '';
+        document.getElementById('titleOrig').value = bookData.book_title_original || '';
+        document.getElementById('authors').value = (bookData.authors || []).join(', ');
+        document.getElementById('publisher').value = bookData.publisher || '';
+        document.getElementById('pubDate').value = bookData.publication_date || '';
+        document.getElementById('summary').value = bookData.summary || '';
+        
+        const linkEl = document.getElementById('booksLink');
+        const searchKey = encodeURIComponent(query);
+        linkEl.href = bookData.books_link || `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
+        linkEl.innerText = '點此前往博客來頁面';
+
+      } catch (e) {
+        alert('AI 檢索失敗：' + e.message);
+      }
+    }
 
     async function loadBooksFromCloud() {
       document.getElementById('cloudStatus').innerText = '🔄 同步中...';
@@ -503,11 +643,14 @@
       document.getElementById('authors').value = book.authors || '';
       document.getElementById('publisher').value = book.publisher || '';
       document.getElementById('pubDate').value = book.pubDate || '';
-      document.getElementById('booksLink').value = book.booksLink || '';
       document.getElementById('summary').value = book.summary || '';
       document.getElementById('coverUrl').value = book.coverUrl || '';
       updateCoverPreview(book.coverUrl || '');
       
+      const linkEl = document.getElementById('booksLink');
+      linkEl.href = book.booksLink || '#';
+      linkEl.innerText = book.booksLink ? '點此前往博客來頁面' : '尚未產生';
+
       document.getElementById('medium').value = book.medium || '紙本書';
       document.getElementById('source').value = book.source || '自己購買';
 
@@ -553,7 +696,7 @@
         source: document.getElementById('source').value,
         summary: document.getElementById('summary').value,
         cover_url: document.getElementById('coverUrl').value,
-        books_link: document.getElementById('booksLink').value,
+        books_link: document.getElementById('booksLink').href,
         tags: Array.from(selectedTags),
         status: document.getElementById('status').value,
         finish_date: document.getElementById('finishDate').value,
@@ -580,10 +723,14 @@
       document.getElementById('authors').value = '';
       document.getElementById('publisher').value = '';
       document.getElementById('pubDate').value = '';
-      document.getElementById('booksLink').value = '';
       document.getElementById('summary').value = '';
       document.getElementById('coverUrl').value = '';
       updateCoverPreview('');
+      
+      const linkEl = document.getElementById('booksLink');
+      linkEl.href = '#';
+      linkEl.innerText = '尚未產生';
+
       selectedTags.clear();
       renderTags();
       document.getElementById('status').value = '已完讀';
