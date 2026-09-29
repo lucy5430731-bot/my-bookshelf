@@ -61,11 +61,19 @@
     <div id="view-add" class="hidden space-y-6">
       <!-- API Key 設定與自動檢索區 -->
       <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-amber-900 mb-1">
-            Google AI Studio API Keys (可填多組以英文逗號分隔，實現自動輪播備用)：
-          </label>
-          <input type="password" id="apiKey" placeholder="Key1, Key2, Key3..." class="w-full p-2 border border-amber-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-amber-900 mb-1">
+              Gemini API Keys (可填多組逗號分隔)：
+            </label>
+            <input type="password" id="apiKey" placeholder="AIzaSy..." class="w-full p-2 border border-amber-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-amber-900 mb-1">
+              OpenAI GPT API Key (備用備援引擎)：
+            </label>
+            <input type="password" id="gptApiKey" placeholder="sk-proj-..." class="w-full p-2 border border-amber-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white">
+          </div>
         </div>
         <div class="flex gap-2">
           <input type="text" id="bookSearchInput" placeholder="輸入中文書名或 ISBN 碼 (例如 原子習慣 / 9789861755267)..." class="flex-1 p-2.5 border border-amber-300 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
@@ -336,18 +344,25 @@
     let selectedTags = new Set();
     let currentModalBookId = null;
 
-    const savedKey = localStorage.getItem('gemini_api_key');
-    if (savedKey) document.getElementById('apiKey').value = savedKey;
+    // 讀取與儲存 API Keys
+    const savedGeminiKey = localStorage.getItem('gemini_api_key');
+    if (savedGeminiKey) document.getElementById('apiKey').value = savedGeminiKey;
     document.getElementById('apiKey').addEventListener('change', (e) => {
       localStorage.setItem('gemini_api_key', e.target.value.trim());
     });
 
-    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+    const savedGptKey = localStorage.getItem('gpt_api_key');
+    if (savedGptKey) document.getElementById('gptApiKey').value = savedGptKey;
+    document.getElementById('gptApiKey').addEventListener('change', (e) => {
+      localStorage.setItem('gpt_api_key', e.target.value.trim());
+    });
 
-    // ⚡ 核心：多重 Open API + Gemini API 輪播檢索機制
+    // ⚡ 核心檢索函式 (Google Books -> Open Library -> Gemini -> GPT)
     async function fetchBookInfo() {
       const query = document.getElementById('bookSearchInput').value.trim();
-      const rawApiKeys = document.getElementById('apiKey').value.trim();
+      const rawGeminiKeys = document.getElementById('apiKey').value.trim();
+      const gptKey = document.getElementById('gptApiKey').value.trim();
+
       if (!query) return alert('請輸入中文書名或 ISBN！');
 
       const btn = document.getElementById('searchBtn');
@@ -373,138 +388,154 @@
         }
 
         if (gbItem) {
-          const info = gbItem.volumeInfo;
-          document.getElementById('titleZh').value = info.title || '';
-          document.getElementById('titleOrig').value = info.subtitle || '';
-          document.getElementById('authors').value = (info.authors || []).join(', ');
-          document.getElementById('publisher').value = info.publisher || '';
-          document.getElementById('pubDate').value = info.publishedDate || '';
-          document.getElementById('summary').value = info.description || '';
-
-          const searchKey = encodeURIComponent(query);
-          const linkEl = document.getElementById('booksLink');
-          linkEl.href = `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
-          linkEl.innerText = '點此前往博客來頁面';
-
-          if (info.imageLinks && info.imageLinks.thumbnail) {
-            const httpsCover = info.imageLinks.thumbnail.replace('http://', 'https://');
-            document.getElementById('coverUrl').value = httpsCover;
-            updateCoverPreview(httpsCover);
-          }
-
-          btn.innerText = '⚡ 自動帶入資料';
-          btn.disabled = false;
+          fillBookData({
+            titleZh: gbItem.volumeInfo.title || '',
+            titleOrig: gbItem.volumeInfo.subtitle || '',
+            authors: (gbItem.volumeInfo.authors || []).join(', '),
+            publisher: gbItem.volumeInfo.publisher || '',
+            pubDate: gbItem.volumeInfo.publishedDate || '',
+            summary: gbItem.volumeInfo.description || '',
+            coverUrl: gbItem.volumeInfo.imageLinks?.thumbnail?.replace('http://', 'https://') || '',
+            booksLink: `https://search.books.com.tw/search/query/key/${encodeURIComponent(query)}/cat/all`
+          });
           return;
         }
 
-        // 第二層：Open Library Open API (不需要 API Key)
+        // 第二層：Open Library API
         if (/^\d{10,13}$/.test(cleanQuery)) {
           try {
             let olRes = await fetch(`https://openlibrary.org/api/books?bibkeys=ISBN:${cleanQuery}&format=json&jscmd=data`);
             let olData = await olRes.json();
             let olBook = olData[`ISBN:${cleanQuery}`];
             if (olBook) {
-              document.getElementById('titleZh').value = olBook.title || '';
-              document.getElementById('authors').value = (olBook.authors || []).map(a=>a.name).join(', ');
-              document.getElementById('publisher').value = (olBook.publishers || []).map(p=>p.name).join(', ');
-              document.getElementById('pubDate').value = olBook.publish_date || '';
-              
-              const linkEl = document.getElementById('booksLink');
-              linkEl.href = `https://search.books.com.tw/search/query/key/${cleanQuery}/cat/all`;
-              linkEl.innerText = '點此前往博客來頁面';
-
-              if (olBook.cover && olBook.cover.medium) {
-                document.getElementById('coverUrl').value = olBook.cover.medium;
-                updateCoverPreview(olBook.cover.medium);
-              }
-              btn.innerText = '⚡ 自動帶入資料';
-              btn.disabled = false;
+              fillBookData({
+                titleZh: olBook.title || '',
+                authors: (olBook.authors || []).map(a=>a.name).join(', '),
+                publisher: (olBook.publishers || []).map(p=>p.name).join(', '),
+                pubDate: olBook.publish_date || '',
+                coverUrl: olBook.cover?.medium || '',
+                booksLink: `https://search.books.com.tw/search/query/key/${cleanQuery}/cat/all`
+              });
               return;
             }
           } catch(e){}
         }
 
-        // 第三層：Gemini AI 輪播 API Keys 機制
-        const apiKeys = rawApiKeys.split(',').map(k => k.trim()).filter(k => k);
-        if (apiKeys.length > 0) {
-          btn.innerText = '🔍 AI 輪播檢索中...';
-          await fetchFromGeminiRotation(query, apiKeys, 0);
-        } else {
-          alert('前兩層開放資料庫查無此書。可於上方填入 API Key 開啟 AI 輪播檢索。');
+        // 第三層：Gemini AI
+        const geminiKeys = rawGeminiKeys.split(',').map(k => k.trim()).filter(k => k);
+        if (geminiKeys.length > 0) {
+          btn.innerText = '🔍 Gemini AI 檢索中...';
+          try {
+            await fetchFromGeminiRotation(query, geminiKeys, 0);
+            return;
+          } catch (geminiErr) {
+            console.warn('Gemini 全部 Key 失敗或額滿，準備切換至 GPT Engine:', geminiErr);
+          }
         }
 
+        // 第四層：GPT-4o-mini (備援引擎)
+        if (gptKey) {
+          btn.innerText = '🤖 GPT 備用引擎檢索中...';
+          await fetchFromGPT(query, gptKey);
+          return;
+        }
+
+        alert('公開資料庫未找到此書。若 Gemini 無法使用，可於上方輸入 OpenAI GPT Key 作為備用引擎。');
+
       } catch (err) {
-        alert('檢索過程發生錯誤：' + err.message);
+        alert('檢索發生錯誤：' + err.message);
       } finally {
         btn.innerText = '⚡ 自動帶入資料';
         btn.disabled = false;
       }
     }
 
-    // 🔄 Gemini 輪播與限流重試邏輯
-    async function fetchFromGeminiRotation(query, apiKeys, keyIndex) {
-      if (keyIndex >= apiKeys.length) {
-        throw new Error('所有提供的 API Keys 均已達配額上限，請稍後再試。');
+    // 填充表單資料之共用函式
+    function fillBookData(data) {
+      document.getElementById('titleZh').value = data.titleZh || '';
+      document.getElementById('titleOrig').value = data.titleOrig || '';
+      document.getElementById('authors').value = data.authors || '';
+      document.getElementById('publisher').value = data.publisher || '';
+      document.getElementById('pubDate').value = data.pubDate || '';
+      document.getElementById('summary').value = data.summary || '';
+      
+      const linkEl = document.getElementById('booksLink');
+      linkEl.href = data.booksLink || '#';
+      linkEl.innerText = data.booksLink ? '點此前往博客來頁面' : '尚未產生';
+
+      if (data.coverUrl) {
+        document.getElementById('coverUrl').value = data.coverUrl;
+        updateCoverPreview(data.coverUrl);
       }
+    }
+
+    // 🔄 Gemini 輪播邏輯
+    async function fetchFromGeminiRotation(query, apiKeys, keyIndex) {
+      if (keyIndex >= apiKeys.length) throw new Error('Gemini Keys 全數達到上限');
 
       const currentKey = apiKeys[keyIndex];
       const modelName = 'gemini-3.8-flash';
 
-      const systemPrompt = "你是一個圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。books_link 請輸出博客來最新搜尋格式：https://search.books.com.tw/search/query/key/【ISBN或關鍵字】/cat/all";
-      const jsonSchema = {
-        type: "OBJECT",
-        properties: {
-          book_title_zh: { type: "STRING" },
-          book_title_original: { type: "STRING" },
-          authors: { type: "ARRAY", items: { type: "STRING" } },
-          publisher: { type: "STRING" },
-          publication_date: { type: "STRING" },
-          summary: { type: "STRING" },
-          books_link: { type: "STRING" }
-        },
-        required: ["book_title_zh", "authors", "publisher", "summary", "books_link"]
-      };
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${currentKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `請檢索這本書的完整資料：${query}` }] }],
+          systemInstruction: { parts: [{ text: "請以 JSON 格式回傳：{book_title_zh, book_title_original, authors:[], publisher, publication_date, summary, books_link}" }] },
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      });
 
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${currentKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: `請檢索這本書的完整資料：${query}` }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: { responseMimeType: "application/json", responseSchema: jsonSchema }
-          })
-        });
-
-        const result = await response.json();
-
-        // 觸發 429 限流，自動切換至下一組 Key
-        if (result.error && (result.error.code === 429 || result.error.status === 'RESOURCE_EXHAUSTED')) {
-          console.warn(`API Key [${keyIndex + 1}] 已滿，切換至下組 Key...`);
-          return await fetchFromGeminiRotation(query, apiKeys, keyIndex + 1);
-        }
-
-        if (result.error) throw new Error(result.error.message);
-
-        const bookData = JSON.parse(result.candidates[0].content.parts[0].text);
-        document.getElementById('titleZh').value = bookData.book_title_zh || '';
-        document.getElementById('titleOrig').value = bookData.book_title_original || '';
-        document.getElementById('authors').value = (bookData.authors || []).join(', ');
-        document.getElementById('publisher').value = bookData.publisher || '';
-        document.getElementById('pubDate').value = bookData.publication_date || '';
-        document.getElementById('summary').value = bookData.summary || '';
-        
-        const linkEl = document.getElementById('booksLink');
-        const searchKey = encodeURIComponent(query);
-        linkEl.href = bookData.books_link || `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
-        linkEl.innerText = '點此前往博客來頁面';
-
-      } catch (e) {
-        if (keyIndex < apiKeys.length - 1) {
-          return await fetchFromGeminiRotation(query, apiKeys, keyIndex + 1);
-        }
-        throw e;
+      const result = await response.json();
+      if (result.error && (result.error.code === 429 || result.error.status === 'RESOURCE_EXHAUSTED')) {
+        return await fetchFromGeminiRotation(query, apiKeys, keyIndex + 1);
       }
+
+      if (result.error) throw new Error(result.error.message);
+
+      const parsed = JSON.parse(result.candidates[0].content.parts[0].text);
+      fillBookData({
+        titleZh: parsed.book_title_zh,
+        titleOrig: parsed.book_title_original,
+        authors: (parsed.authors || []).join(', '),
+        publisher: parsed.publisher,
+        pubDate: parsed.publication_date,
+        summary: parsed.summary,
+        booksLink: parsed.books_link || `https://search.books.com.tw/search/query/key/${encodeURIComponent(query)}/cat/all`
+      });
+    }
+
+    // 🤖 GPT-4o-mini API 請求邏輯
+    async function fetchFromGPT(query, gptKey) {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${gptKey}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: '你是一個圖書整理員。請搜尋並以 JSON 格式回傳書籍資料，包含鍵名：titleZh (中文書名), titleOrig (原文書名), authors (陣列), publisher (出版社), pubDate (出版日期 YYYY-MM-DD), summary (簡介)。' },
+            { role: 'user', content: `請檢索這本書：${query}` }
+          ],
+          response_format: { type: "json_object" }
+        })
+      });
+
+      const result = await response.json();
+      if (result.error) throw new Error(result.error.message);
+
+      const parsed = JSON.parse(result.choices[0].message.content);
+      fillBookData({
+        titleZh: parsed.titleZh,
+        titleOrig: parsed.titleOrig,
+        authors: Array.isArray(parsed.authors) ? parsed.authors.join(', ') : parsed.authors,
+        publisher: parsed.publisher,
+        pubDate: parsed.pubDate,
+        summary: parsed.summary,
+        booksLink: `https://search.books.com.tw/search/query/key/${encodeURIComponent(query)}/cat/all`
+      });
     }
 
     async function loadBooksFromCloud() {
