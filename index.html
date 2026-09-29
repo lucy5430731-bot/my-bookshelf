@@ -35,7 +35,6 @@
             <span id="noCoverText" class="text-xs text-center p-2">暫無封面</span>
           </div>
           
-          <!-- 手動上傳或貼網址 -->
           <div class="w-full space-y-2">
             <label class="block w-full text-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-300 cursor-pointer font-medium transition">
               📷 選擇上傳圖片
@@ -134,16 +133,17 @@
   </div>
 
   <script>
-    // 預設帶入今天的日期
     document.getElementById('finishDate').valueAsDate = new Date();
 
-    // 載入本地儲存的 API Key
     const savedKey = localStorage.getItem('gemini_api_key');
     if (savedKey) document.getElementById('apiKey').value = savedKey;
 
     document.getElementById('apiKey').addEventListener('change', (e) => {
       localStorage.setItem('gemini_api_key', e.target.value.trim());
     });
+
+    // 輔助函式：延遲毫秒
+    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     async function fetchBookInfo() {
       const apiKey = document.getElementById('apiKey').value.trim();
@@ -156,7 +156,6 @@
       btn.innerText = '🔍 正在搜尋分析中...';
       btn.disabled = true;
 
-      // 修正博客來最新搜尋 URL 格式
       const systemPrompt = "你是一個專業圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。books_link 請輸出博客來最新搜尋格式：https://search.books.com.tw/search/query/key/【ISBN或書名關鍵字】/cat/all";
       const jsonSchema = {
         type: "OBJECT",
@@ -173,40 +172,52 @@
         required: ["book_title_zh", "authors", "publisher", "summary", "books_link"]
       };
 
-      const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+      // 嚴選當前有效的官方主力模型與備援模型
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro'];
       let data = null;
       let lastError = null;
 
       for (const modelName of modelsToTry) {
-        try {
-          const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `請檢索這本書的完整資料：${query}` }] }],
-              systemInstruction: { parts: [{ text: systemPrompt }] },
-              generationConfig: {
-                responseMimeType: "application/json",
-                responseSchema: jsonSchema
-              }
-            })
-          });
+        // 每個模型最多重試 2 次（應付 503 瞬間流量）
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            if (attempt > 1) {
+              btn.innerText = `⏳ 伺服器忙碌，1秒後重試 (${modelName})...`;
+              await delay(1200);
+            }
 
-          const result = await response.json();
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: `請檢索這本書的完整資料：${query}` }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  responseSchema: jsonSchema
+                }
+              })
+            });
 
-          if (!result.error) {
-            data = result;
-            break;
-          } else {
-            lastError = result.error;
+            const result = await response.json();
+
+            if (!result.error) {
+              data = result;
+              break; // 成功取得資料，跳出重試與備援迴圈
+            } else {
+              lastError = result.error;
+              // 如果不是 503 忙碌，就不重複嘗試該模型，直接換下一個模型
+              if (result.error.code !== 503) break;
+            }
+          } catch (e) {
+            lastError = e;
           }
-        } catch (e) {
-          lastError = e;
         }
+        if (data) break; // 已成功取得，跳出模型切換迴圈
       }
 
       if (!data) {
-        alert(`Google API 呼叫失敗：${lastError?.message || '伺服器忙碌中'}，請稍後再試。`);
+        alert(`Google API 呼叫失敗：${lastError?.message || '伺服器忙碌中'}，請稍微等候幾秒再試一次。`);
         btn.innerText = '✨ AI 自動帶入';
         btn.disabled = false;
         return;
@@ -215,7 +226,6 @@
       try {
         const bookData = JSON.parse(data.candidates[0].content.parts[0].text);
 
-        // 填入文字資料
         document.getElementById('titleZh').value = bookData.book_title_zh || '';
         document.getElementById('titleOrig').value = bookData.book_title_original || '';
         document.getElementById('authors').value = (bookData.authors || []).join(', ');
@@ -223,7 +233,6 @@
         document.getElementById('pubDate').value = `${bookData.publication_date || ''} / ${(bookData.categories || []).join(', ')}`;
         document.getElementById('summary').value = bookData.summary || '';
         
-        // 帶入修正後的博客來搜尋網址
         const linkEl = document.getElementById('booksLink');
         const searchKey = encodeURIComponent(query);
         const booksUrl = bookData.books_link || `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
@@ -239,25 +248,22 @@
       }
     }
 
-    // 處理手動選擇本機圖片
     function handleFileUpload(event) {
       const file = event.target.files[0];
       if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
           updateCoverPreview(e.target.result);
-          document.getElementById('coverUrl').value = ''; // 清空網址欄位
+          document.getElementById('coverUrl').value = '';
         };
         reader.readAsDataURL(file);
       }
     }
 
-    // 監聽網址輸入框
     document.getElementById('coverUrl').addEventListener('input', (e) => {
       updateCoverPreview(e.target.value.trim());
     });
 
-    // 更新圖片預覽顯示
     function updateCoverPreview(src) {
       const img = document.getElementById('coverPreview');
       const text = document.getElementById('noCoverText');
