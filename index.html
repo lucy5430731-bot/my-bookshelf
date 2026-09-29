@@ -124,7 +124,7 @@
           </div>
         </div>
 
-        <!-- 輔助標籤多選區（含可刪除按鈕） -->
+        <!-- 輔助標籤多選區 -->
         <div>
           <label class="block text-xs text-slate-500 font-medium mb-2">次要主題標籤 (可多選)</label>
           <div id="tagContainer" class="flex flex-wrap gap-2 mb-3"></div>
@@ -237,10 +237,9 @@
           <canvas id="primaryCategoryChart"></canvas>
         </div>
         
-        <!-- 標籤出現頻率 (排行榜模式) -->
         <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between">
           <div>
-            <h3 class="text-sm font-bold text-slate-700 mb-1 text-center">🏷️ 標籤出現頻率</h3>
+            <h3 class="text-sm font-bold text-slate-700 mb-1 text-center">🏷️️ 標籤出現頻率</h3>
             <p class="text-[10px] text-slate-400 text-center mb-4">依據書籍標註的熱門標籤數量由多到少排列</p>
             <div id="tagsRankList" class="space-y-2 max-h-64 overflow-y-auto pr-1"></div>
           </div>
@@ -305,23 +304,23 @@
   </div>
 
   <script>
+    // 10 大全新主要分類與配態
     const categoryConfig = {
-      '商業思維': { color: '#3b82f6', bgClass: 'bg-blue-50', borderClass: 'border-blue-200' },
-      '市場行銷': { color: '#06b6d4', bgClass: 'bg-cyan-50', borderClass: 'border-cyan-200' },
-      '投資理財': { color: '#10b981', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-200' },
-      '職場工作術': { color: '#6366f1', bgClass: 'bg-indigo-50', borderClass: 'border-indigo-200' },
-      '心理與成長': { color: '#8b5cf6', bgClass: 'bg-purple-50', borderClass: 'border-purple-200' },
-      '中文小說': { color: '#ec4899', bgClass: 'bg-pink-50', borderClass: 'border-pink-200' },
-      '翻譯小說': { color: '#f43f5e', bgClass: 'bg-rose-50', borderClass: 'border-rose-200' },
-      '女性主義': { color: '#d946ef', bgClass: 'bg-fuchsia-50', borderClass: 'border-fuchsia-200' },
-      '人文社會': { color: '#f59e0b', bgClass: 'bg-amber-50', borderClass: 'border-amber-200' },
-      '科技與趨勢': { color: '#0284c7', bgClass: 'bg-sky-50', borderClass: 'border-sky-200' },
+      '文學小說': { color: '#ec4899', bgClass: 'bg-pink-50', borderClass: 'border-pink-200' },
+      '商業理財': { color: '#3b82f6', bgClass: 'bg-blue-50', borderClass: 'border-blue-200' },
+      '藝術設計': { color: '#8b5cf6', bgClass: 'bg-purple-50', borderClass: 'border-purple-200' },
+      '人文社科': { color: '#f59e0b', bgClass: 'bg-amber-50', borderClass: 'border-amber-200' },
+      '心理勵志': { color: '#10b981', bgClass: 'bg-emerald-50', borderClass: 'border-emerald-200' },
+      '自然科普': { color: '#0284c7', bgClass: 'bg-sky-50', borderClass: 'border-sky-200' },
+      '醫療保健': { color: '#059669', bgClass: 'bg-teal-50', borderClass: 'border-teal-200' },
+      '飲食':     { color: '#f97316', bgClass: 'bg-orange-50', borderClass: 'border-orange-200' },
+      '生活風格': { color: '#d946ef', bgClass: 'bg-fuchsia-50', borderClass: 'border-fuchsia-200' },
+      '旅遊':     { color: '#14b8a6', bgClass: 'bg-emerald-50/70', borderClass: 'border-emerald-200' },
       '其他類型': { color: '#64748b', bgClass: 'bg-slate-50', borderClass: 'border-slate-200' }
     };
 
     let defaultTags = JSON.parse(localStorage.getItem('my_tags') || JSON.stringify([
-      '個人成長/習慣', '人際溝通', '情緒整理', '領導管理', '創業',
-      '哲學思考', '歷史傳記', '科普', '旅遊/冒險', '藝術/設計'
+      '個人成長', '習慣養成', '時間管理', '人際溝通', '情緒整理', '女性主義', '西班牙文化', '棒球歷史'
     ]));
 
     let books = JSON.parse(localStorage.getItem('my_bookshelf') || '[]');
@@ -412,7 +411,7 @@
           <div class="h-44 bg-slate-200 overflow-hidden relative">
             <img src="${coverSrc}" class="w-full h-full object-cover">
             <span class="absolute top-2 right-2 text-[10px] bg-slate-800/80 text-white px-2 py-0.5 rounded-full">${book.status || '已完讀'}</span>
-            <span class="absolute bottom-2 left-2 text-[9px] font-bold text-white bg-indigo-600/90 px-1.5 py-0.5 rounded">${book.primaryCategory || '通用'}</span>
+            <span class="absolute bottom-2 left-2 text-[9px] font-bold text-white bg-indigo-600/90 px-1.5 py-0.5 rounded">${book.primaryCategory || '文學小說'}</span>
           </div>
           <div class="p-3 flex-1 flex flex-col justify-between space-y-1">
             <div>
@@ -439,7 +438,7 @@
       document.getElementById('modalTitleZh').innerText = book.titleZh;
       document.getElementById('modalTitleOrig').innerText = book.titleOrig || '';
       document.getElementById('modalAuthors').innerText = book.authors || '無';
-      document.getElementById('modalMediumSource').innerText = `${book.medium || '紙本書'} (${book.source || '購買'})`;
+      document.getElementById('modalMediumSource').innerText = `${book.medium || '紙本書'} (${book.source || '自己購買'})`;
       document.getElementById('modalFinishDate').innerText = book.finishDate || '未紀錄';
       document.getElementById('modalRating').innerText = `⭐ ${book.rating} / 5.0`;
       document.getElementById('modalSummary').innerText = book.summary || '無簡介';
@@ -468,7 +467,7 @@
 
       closeModal();
       document.getElementById('editingBookId').value = book.id;
-      document.getElementById('primaryCategory').value = book.primaryCategory || '商業思維';
+      document.getElementById('primaryCategory').value = book.primaryCategory || '文學小說';
       onPrimaryCategoryChange();
 
       document.getElementById('titleZh').value = book.titleZh || '';
@@ -547,7 +546,7 @@
 
     function resetForm() {
       document.getElementById('editingBookId').value = '';
-      document.getElementById('primaryCategory').value = '商業思維';
+      document.getElementById('primaryCategory').value = '文學小說';
       onPrimaryCategoryChange();
       document.getElementById('titleZh').value = '';
       document.getElementById('titleOrig').value = '';
@@ -607,7 +606,6 @@
       }
     }
 
-    // 渲染標籤區 (具備可點選 + 刪除標籤按鈕)
     function renderTags() {
       const container = document.getElementById('tagContainer');
       container.innerHTML = '';
@@ -662,7 +660,6 @@
       }
     }
 
-    // 閱讀分析圖表與排行榜繪製
     let primaryCatChartInstance = null;
     let ratingChartInstance = null;
     let mediumChartInstance = null;
@@ -682,11 +679,11 @@
       document.getElementById('stat-top-medium').innerText = topMedium ? topMedium[0] : '-';
 
       const primaryCatMap = {};
-      books.forEach(b => { primaryCatMap[b.primaryCategory || '商業思維'] = (primaryCatMap[b.primaryCategory || '商業思維'] || 0) + 1; });
+      books.forEach(b => { primaryCatMap[b.primaryCategory || '文學小說'] = (primaryCatMap[b.primaryCategory || '文學小說'] || 0) + 1; });
       const topCat = Object.entries(primaryCatMap).sort((a,b) => b[1] - a[1])[0];
       document.getElementById('stat-top-category').innerText = topCat ? topCat[0] : '-';
 
-      // 1. 閱讀類型占比 (圓餅圖)
+      // 1. 閱讀類型占比
       if (primaryCatChartInstance) primaryCatChartInstance.destroy();
       const ctx1 = document.getElementById('primaryCategoryChart').getContext('2d');
       primaryCatChartInstance = new Chart(ctx1, {
@@ -701,7 +698,7 @@
         options: { responsive: true }
       });
 
-      // 2. 標籤出現頻率 (由多到少排行榜清單)
+      // 2. 標籤排行榜
       const tagMap = {};
       books.forEach(b => (b.tags || []).forEach(t => { tagMap[t] = (tagMap[t] || 0) + 1; }));
       const sortedTags = Object.entries(tagMap).sort((a, b) => b[1] - a[1]);
@@ -725,7 +722,7 @@
         });
       }
 
-      // 3. 評分分布統計
+      // 3. 評分分布
       const ratingMap = { '5.0⭐': 0, '4.0⭐': 0, '3.0⭐': 0, '2.0⭐': 0, '1.0⭐': 0 };
       books.forEach(b => {
         const r = Math.floor(parseFloat(b.rating || 5)) + '.0⭐';
@@ -743,7 +740,7 @@
         options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } } }
       });
 
-      // 4. 閱讀載體占比圖
+      // 4. 閱讀載體占比
       if (mediumChartInstance) mediumChartInstance.destroy();
       const ctx4 = document.getElementById('mediumChart').getContext('2d');
       mediumChartInstance = new Chart(ctx4, {
