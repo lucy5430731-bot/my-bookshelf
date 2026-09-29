@@ -28,13 +28,21 @@
     <!-- 表單內容 -->
     <div id="bookForm" class="space-y-6">
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <!-- 封面預覽 -->
+        <!-- 封面上傳與預覽 -->
         <div class="flex flex-col items-center">
-          <div class="w-36 h-48 bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center text-slate-400 border border-slate-300 mb-2">
+          <div class="w-36 h-48 bg-slate-200 rounded-lg overflow-hidden flex items-center justify-center text-slate-400 border border-slate-300 mb-3 relative">
             <img id="coverPreview" src="" class="w-full h-full object-cover hidden">
             <span id="noCoverText" class="text-xs text-center p-2">暫無封面</span>
           </div>
-          <input type="text" id="coverUrl" placeholder="圖片網址 (可自訂替換)" class="w-full text-xs p-2 border rounded-lg">
+          
+          <!-- 手動上傳或貼網址 -->
+          <div class="w-full space-y-2">
+            <label class="block w-full text-center bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs py-2 px-3 rounded-lg border border-slate-300 cursor-pointer font-medium transition">
+              📷 選擇上傳圖片
+              <input type="file" id="coverFileInput" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+            </label>
+            <input type="text" id="coverUrl" placeholder="或貼上圖片網址..." class="w-full text-xs p-2 border rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500">
+          </div>
         </div>
 
         <!-- 書籍基本資料 -->
@@ -148,7 +156,8 @@
       btn.innerText = '🔍 正在搜尋分析中...';
       btn.disabled = true;
 
-      const systemPrompt = "你是一個專業圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。博客來連結請優先使用此搜尋格式：https://www.books.com.tw/seek/exep/main_search.php?key=【ISBN或關鍵字】";
+      // 修正博客來最新搜尋 URL 格式
+      const systemPrompt = "你是一個專業圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。books_link 請輸出博客來最新搜尋格式：https://search.books.com.tw/search/query/key/【ISBN或書名關鍵字】/cat/all";
       const jsonSchema = {
         type: "OBJECT",
         properties: {
@@ -159,13 +168,11 @@
           publication_date: { type: "STRING" },
           categories: { type: "ARRAY", items: { type: "STRING" } },
           summary: { type: "STRING" },
-          books_link: { type: "STRING" },
-          cover_image_url: { type: "STRING" }
+          books_link: { type: "STRING" }
         },
         required: ["book_title_zh", "authors", "publisher", "summary", "books_link"]
       };
 
-      // 備援模型順序：先試 2.5，若忙碌/失敗則嘗試 1.5
       const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash'];
       let data = null;
       let lastError = null;
@@ -189,19 +196,17 @@
 
           if (!result.error) {
             data = result;
-            break; // 成功取得資料，跳出備援迴圈
+            break;
           } else {
             lastError = result.error;
-            console.warn(`模型 ${modelName} 呼叫失敗，嘗試下一個備援模型...`, result.error);
           }
         } catch (e) {
           lastError = e;
         }
       }
 
-      // 所有備援模型皆嘗試失敗時
       if (!data) {
-        alert(`Google API 呼叫失敗：${lastError?.message || '伺服器忙碌中'} (錯誤碼: ${lastError?.code || '503'})，請稍後再試。`);
+        alert(`Google API 呼叫失敗：${lastError?.message || '伺服器忙碌中'}，請稍後再試。`);
         btn.innerText = '✨ AI 自動帶入';
         btn.disabled = false;
         return;
@@ -210,7 +215,7 @@
       try {
         const bookData = JSON.parse(data.candidates[0].content.parts[0].text);
 
-        // 填入表單欄位
+        // 填入文字資料
         document.getElementById('titleZh').value = bookData.book_title_zh || '';
         document.getElementById('titleOrig').value = bookData.book_title_original || '';
         document.getElementById('authors').value = (bookData.authors || []).join(', ');
@@ -218,17 +223,12 @@
         document.getElementById('pubDate').value = `${bookData.publication_date || ''} / ${(bookData.categories || []).join(', ')}`;
         document.getElementById('summary').value = bookData.summary || '';
         
+        // 帶入修正後的博客來搜尋網址
         const linkEl = document.getElementById('booksLink');
-        linkEl.href = bookData.books_link || '#';
-        linkEl.innerText = '點此前往博客來商品頁';
-
-        if (bookData.cover_image_url) {
-          document.getElementById('coverUrl').value = bookData.cover_image_url;
-          updateCoverPreview(bookData.cover_image_url);
-        } else {
-          document.getElementById('coverUrl').value = '';
-          updateCoverPreview('');
-        }
+        const searchKey = encodeURIComponent(query);
+        const booksUrl = bookData.books_link || `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
+        linkEl.href = booksUrl;
+        linkEl.innerText = '點此前往博客來搜尋頁面';
 
       } catch (err) {
         alert('解析資料時發生錯誤：' + err.message);
@@ -239,18 +239,34 @@
       }
     }
 
+    // 處理手動選擇本機圖片
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          updateCoverPreview(e.target.result);
+          document.getElementById('coverUrl').value = ''; // 清空網址欄位
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // 監聽網址輸入框
     document.getElementById('coverUrl').addEventListener('input', (e) => {
       updateCoverPreview(e.target.value.trim());
     });
 
-    function updateCoverPreview(url) {
+    // 更新圖片預覽顯示
+    function updateCoverPreview(src) {
       const img = document.getElementById('coverPreview');
       const text = document.getElementById('noCoverText');
-      if (url) {
-        img.src = url;
+      if (src) {
+        img.src = src;
         img.classList.remove('hidden');
         text.classList.add('hidden');
       } else {
+        img.src = '';
         img.classList.add('hidden');
         text.classList.remove('hidden');
       }
