@@ -6,6 +6,7 @@
   <title>我的個人讀書紀錄</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     .tag-btn.active { background-color: #4f46e5; color: white; border-color: #4f46e5; }
     .tab-btn.active { border-bottom: 3px solid #4f46e5; color: #4f46e5; font-weight: bold; }
@@ -17,7 +18,7 @@
     <!-- 頂部 Header & Tabs -->
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 pb-4 border-b border-slate-200 gap-4">
       <h1 class="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-2">
-        <span>📚</span> 我的個人讀書紀錄
+        <span>📚</span> 我的個人讀書紀錄 <span id="cloudStatus" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-normal">☁️ 雲端同步中</span>
       </h1>
       <div class="flex gap-4 border-b md:border-b-0 w-full md:w-auto justify-center">
         <button onclick="switchTab('shelf')" id="tab-shelf" class="tab-btn active pb-2 px-3 text-sm md:text-base">📚 我的書櫃</button>
@@ -26,10 +27,10 @@
       </div>
     </div>
 
-    <!-- ================= TAB 1: 我的書櫃 ================= -->
+    <!-- TAB 1: 我的書櫃 -->
     <div id="view-shelf" class="space-y-6">
       <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-5 gap-3 items-center">
-        <input type="text" id="searchInput" oninput="filterBooks()" placeholder="🔍 搜尋書名、作者、心得..." class="p-2 border rounded-lg text-sm md:col-span-1">
+        <input type="text" id="searchInput" oninput="filterBooks()" placeholder="🔍 搜尋書名、作者..." class="p-2 border rounded-lg text-sm md:col-span-1">
         
         <select id="filterStatus" onchange="filterBooks()" class="p-2 border rounded-lg text-sm bg-white">
           <option value="全部">所有閱讀狀態</option>
@@ -48,7 +49,6 @@
           <option value="ratingDesc">星等評分 (高到低)</option>
         </select>
 
-        <!-- 一鍵匯出 EXCEL 按鈕 -->
         <button onclick="exportToExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium p-2 rounded-lg text-xs md:text-sm transition flex items-center justify-center gap-1 shadow-sm">
           📥 匯出 EXCEL
         </button>
@@ -57,20 +57,8 @@
       <div id="bookGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
     </div>
 
-    <!-- ================= TAB 2: 新增/編輯書籍表單 ================= -->
+    <!-- TAB 2: 新增/編輯書籍表單 -->
     <div id="view-add" class="hidden space-y-6">
-      <div class="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-        <label class="block text-sm font-semibold text-amber-900 mb-1">Google AI Studio API Key：</label>
-        <input type="password" id="apiKey" placeholder="貼上你的 API Key (AIzaSy...)" class="w-full p-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500">
-      </div>
-
-      <div class="flex gap-2">
-        <input type="text" id="bookSearchInput" placeholder="輸入中文書名或 ISBN 碼..." class="flex-1 p-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-        <button onclick="fetchBookInfo()" id="searchBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-6 py-3 rounded-xl transition">
-          <span>⚡ 自動帶入資料</span>
-        </button>
-      </div>
-
       <div id="formContainer" class="p-6 rounded-2xl border transition-all duration-300 bg-slate-50 border-slate-200 space-y-6">
         <input type="hidden" id="editingBookId" value="">
 
@@ -92,7 +80,7 @@
 
           <div class="md:col-span-2 space-y-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-600">主要書籍分類（決定卡片底色與主要數據）*</label>
+              <label class="block text-xs font-semibold text-slate-600">主要書籍分類 *</label>
               <select id="primaryCategory" onchange="onPrimaryCategoryChange()" class="w-full p-2 border border-indigo-300 rounded-lg text-sm font-bold bg-white focus:ring-2 focus:ring-indigo-500">
               </select>
             </div>
@@ -122,7 +110,7 @@
               </div>
               <div>
                 <label class="block text-xs text-slate-500 font-medium">博客來連結</label>
-                <a id="booksLink" href="#" target="_blank" class="text-xs text-indigo-600 underline block mt-2 truncate">尚未產生</a>
+                <input type="text" id="booksLink" placeholder="https://..." class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white">
               </div>
             </div>
           </div>
@@ -206,12 +194,12 @@
         </div>
 
         <button onclick="saveRecord()" id="saveBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
-          💾 儲存讀書紀錄至書櫃
+          💾 儲存讀書紀錄至雲端
         </button>
       </div>
     </div>
 
-    <!-- ================= TAB 3: 閱讀分析數據 ================= -->
+    <!-- TAB 3: 閱讀分析數據 -->
     <div id="view-analytics" class="hidden space-y-6">
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div class="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100">
@@ -261,7 +249,7 @@
 
   </div>
 
-  <!-- 單本書籍詳細資料 Modal -->
+  <!-- 書籍 Modal -->
   <div id="bookModal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
     <div class="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto relative">
       <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
@@ -296,7 +284,7 @@
         <p id="modalNotes" class="text-indigo-800 leading-relaxed"></p>
       </div>
 
-      <a id="modalBooksLink" href="#" target="_blank" class="block text-center text-xs text-indigo-600 underline">前往博客來商品頁</a>
+      <a id="modalBooksLink" href="#" target="_blank" class="block text-center text-xs text-indigo-600 underline">前往商品連結</a>
 
       <div class="grid grid-cols-2 gap-2 pt-2">
         <button onclick="editBook()" class="bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 text-xs py-2 rounded-lg font-medium transition">✏️ 編輯書籍資料</button>
@@ -306,6 +294,11 @@
   </div>
 
   <script>
+    // 已自動帶入你的專屬 Supabase 資訊
+    const SUPABASE_URL = 'https://uvzixotdxlpdzvhbgph.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1dnppeG90ZHhscGR6dmhiZ3BoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2OTQ5MDMsImV4cCI6MjEwNjI3MDkwM30.ezI8Y24n1qbywbo-19e9N7e6FUUsXgsCpjk3hNLRNAQ';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
     const categoryConfig = {
       '文學小說': { color: '#ec4899', bgClass: 'bg-pink-50', borderClass: 'border-pink-200' },
       '商業理財': { color: '#3b82f6', bgClass: 'bg-blue-50', borderClass: 'border-blue-200' },
@@ -324,9 +317,43 @@
       '個人成長', '習慣養成', '時間管理', '人際溝通', '情緒整理', '女性主義', '西班牙文化', '棒球歷史'
     ]));
 
-    let books = JSON.parse(localStorage.getItem('my_bookshelf') || '[]');
+    let books = [];
     let selectedTags = new Set();
     let currentModalBookId = null;
+
+    async function loadBooksFromCloud() {
+      document.getElementById('cloudStatus').innerText = '🔄 同步中...';
+      const { data, error } = await supabaseClient.from('books').select('*').order('created_at', { ascending: false });
+      if (error) {
+        console.error(error);
+        document.getElementById('cloudStatus').innerText = '❌ 同步失敗';
+        return;
+      }
+      
+      books = data.map(b => ({
+        id: b.id,
+        primaryCategory: b.primary_category,
+        titleZh: b.title_zh,
+        titleOrig: b.title_orig,
+        authors: b.authors,
+        publisher: b.publisher,
+        pubDate: b.pub_date,
+        medium: b.medium,
+        source: b.source,
+        summary: b.summary,
+        coverUrl: b.cover_url,
+        booksLink: b.books_link,
+        tags: b.tags || [],
+        status: b.status,
+        finishDate: b.finish_date,
+        rating: b.rating,
+        quotes: b.quotes,
+        notes: b.notes
+      }));
+
+      document.getElementById('cloudStatus').innerText = '☁️ 雲端同步完成';
+      renderShelf();
+    }
 
     function initCategorySelects() {
       const primarySelect = document.getElementById('primaryCategory');
@@ -476,6 +503,7 @@
       document.getElementById('authors').value = book.authors || '';
       document.getElementById('publisher').value = book.publisher || '';
       document.getElementById('pubDate').value = book.pubDate || '';
+      document.getElementById('booksLink').value = book.booksLink || '';
       document.getElementById('summary').value = book.summary || '';
       document.getElementById('coverUrl').value = book.coverUrl || '';
       updateCoverPreview(book.coverUrl || '');
@@ -496,52 +524,50 @@
       switchTab('add');
     }
 
-    function deleteBook() {
+    async function deleteBook() {
       if (confirm('確定要刪除這本書的紀錄嗎？')) {
-        books = books.filter(b => b.id !== currentModalBookId);
-        localStorage.setItem('my_bookshelf', JSON.stringify(books));
+        const { error } = await supabaseClient.from('books').delete().eq('id', currentModalBookId);
+        if (error) return alert('刪除失敗：' + error.message);
+
         closeModal();
-        renderShelf();
+        await loadBooksFromCloud();
       }
     }
 
-    function saveRecord() {
+    async function saveRecord() {
       const titleZh = document.getElementById('titleZh').value.trim();
       if (!titleZh) return alert('請填寫中文書名！');
 
       const editingId = document.getElementById('editingBookId').value;
+      const bookId = editingId || Date.now().toString();
 
-      const bookData = {
-        id: editingId || Date.now().toString(),
-        primaryCategory: document.getElementById('primaryCategory').value,
-        titleZh: titleZh,
-        titleOrig: document.getElementById('titleOrig').value,
+      const payload = {
+        id: bookId,
+        primary_category: document.getElementById('primaryCategory').value,
+        title_zh: titleZh,
+        title_orig: document.getElementById('titleOrig').value,
         authors: document.getElementById('authors').value,
         publisher: document.getElementById('publisher').value,
-        pubDate: document.getElementById('pubDate').value,
+        pub_date: document.getElementById('pubDate').value,
         medium: document.getElementById('medium').value,
         source: document.getElementById('source').value,
         summary: document.getElementById('summary').value,
-        coverUrl: document.getElementById('coverUrl').value,
-        booksLink: document.getElementById('booksLink').href,
+        cover_url: document.getElementById('coverUrl').value,
+        books_link: document.getElementById('booksLink').value,
         tags: Array.from(selectedTags),
         status: document.getElementById('status').value,
-        finishDate: document.getElementById('finishDate').value,
+        finish_date: document.getElementById('finishDate').value,
         rating: document.getElementById('rating').value,
         quotes: document.getElementById('quotes').value,
         notes: document.getElementById('notes').value
       };
 
-      if (editingId) {
-        const idx = books.findIndex(b => b.id === editingId);
-        if (idx !== -1) books[idx] = bookData;
-      } else {
-        books.unshift(bookData);
-      }
+      const { error } = await supabaseClient.from('books').upsert(payload);
+      if (error) return alert('儲存失敗：' + error.message);
 
-      localStorage.setItem('my_bookshelf', JSON.stringify(books));
-      alert(editingId ? '🎉 紀錄更新成功！' : '🎉 成功新增書籍！');
+      alert(editingId ? '🎉 雲端紀錄更新成功！' : '🎉 成功新增書籍至雲端！');
       resetForm();
+      await loadBooksFromCloud();
       switchTab('shelf');
     }
 
@@ -554,6 +580,7 @@
       document.getElementById('authors').value = '';
       document.getElementById('publisher').value = '';
       document.getElementById('pubDate').value = '';
+      document.getElementById('booksLink').value = '';
       document.getElementById('summary').value = '';
       document.getElementById('coverUrl').value = '';
       updateCoverPreview('');
@@ -564,10 +591,9 @@
       document.getElementById('rating').value = '5.0';
       document.getElementById('quotes').value = '';
       document.getElementById('notes').value = '';
-      document.getElementById('saveBtn').innerText = '💾 儲存讀書紀錄至書櫃';
+      document.getElementById('saveBtn').innerText = '💾 儲存讀書紀錄至雲端';
     }
 
-    // Canvas 圖片自動壓縮技術 (解封面保存失敗)
     function handleFileUpload(event) {
       const file = event.target.files[0];
       if (file) {
@@ -662,11 +688,10 @@
       }
     }
 
-    // 匯出 EXCEL (CSV 格式 + UTF-8 防亂碼處理)
     function exportToExcel() {
       if (books.length === 0) return alert('目前沒有任何書籍紀錄可以匯出！');
 
-      const headers = ['中文書名', '原文書名', '作者', '出版社', '出版日期', '主分類', '標籤', '閱讀狀態', '完讀日期', '星等評分', '閱讀載體', '閱讀來源', '金句摘錄', '閱讀心得', '博客來連結'];
+      const headers = ['中文書名', '原文書名', '作者', '出版社', '出版日期', '主分類', '標籤', '閱讀狀態', '完讀日期', '星等評分', '閱讀載體', '閱讀來源', '金句摘錄', '閱讀心得', '商品連結'];
 
       const rows = books.map(b => [
         `"${(b.titleZh || '').replace(/"/g, '""')}"`,
@@ -789,7 +814,7 @@
 
     initCategorySelects();
     renderTags();
-    renderShelf();
+    loadBooksFromCloud();
   </script>
 </body>
 </html>
