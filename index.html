@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>我的個人讀書紀錄</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .tag-btn.active {
+      background-color: #4f46e5;
+      color: white;
+      border-color: #4f46e5;
+    }
+  </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 md:p-8 font-sans">
   <div class="max-w-3xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-xl">
@@ -66,14 +73,26 @@
           </div>
           <div class="grid grid-cols-2 gap-2">
             <div>
-              <label class="block text-xs text-slate-500 font-medium">出版日期 / 分類</label>
-              <input type="text" id="pubDate" placeholder="2024-01 / 心理學" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
+              <label class="block text-xs text-slate-500 font-medium">出版日期</label>
+              <input type="text" id="pubDate" placeholder="YYYY-MM-DD" class="w-full p-2 border border-slate-300 rounded-lg text-sm">
             </div>
             <div>
               <label class="block text-xs text-slate-500 font-medium">博客來連結</label>
               <a id="booksLink" href="#" target="_blank" class="text-xs text-indigo-600 underline block mt-2 truncate">尚未產生</a>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 書籍分類 (多選標籤) -->
+      <div>
+        <label class="block text-xs text-slate-500 font-medium mb-2">書籍分類（可多選）</label>
+        <div id="categoryContainer" class="flex flex-wrap gap-2 mb-2">
+          <!-- 標籤將由 JS 自動生成 -->
+        </div>
+        <div class="flex gap-2">
+          <input type="text" id="customTagInput" placeholder="新增自訂標籤 (如：#西班牙文化)..." class="text-xs p-2 border border-slate-300 rounded-lg flex-1">
+          <button onclick="addCustomTag()" type="button" class="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1 rounded-lg font-medium">新增標籤</button>
         </div>
       </div>
 
@@ -133,6 +152,53 @@
   </div>
 
   <script>
+    // 預設分類清單
+    const defaultCategories = [
+      '商業思維', '市場行銷', '投資理財', '職場工作術', '領導管理',
+      '心理學', '個人成長/習慣', '人際溝通', '情緒整理', '哲學思考',
+      '人文歷史', '社會科學', '深度文化', '翻譯小說', '繁體小說',
+      '傳記/自傳', '人工智慧/科技', '科普', '旅遊/冒險', '藝術/設計'
+    ];
+
+    let selectedCategories = new Set();
+
+    // 初始化渲染分類標籤
+    function renderCategories() {
+      const container = document.getElementById('categoryContainer');
+      container.innerHTML = '';
+      defaultCategories.forEach(cat => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `tag-btn text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 hover:border-indigo-400 transition font-medium ${selectedCategories.has(cat) ? 'active' : ''}`;
+        btn.innerText = cat;
+        btn.onclick = () => toggleCategory(cat, btn);
+        container.appendChild(btn);
+      });
+    }
+
+    function toggleCategory(cat, element) {
+      if (selectedCategories.has(cat)) {
+        selectedCategories.delete(cat);
+        element.classList.remove('active');
+      } else {
+        selectedCategories.add(cat);
+        element.classList.add('active');
+      }
+    }
+
+    function addCustomTag() {
+      const input = document.getElementById('customTagInput');
+      const val = input.value.trim();
+      if (val && !defaultCategories.includes(val)) {
+        defaultCategories.push(val);
+        selectedCategories.add(val);
+        renderCategories();
+        input.value = '';
+      }
+    }
+
+    // 自動開局化
+    renderCategories();
     document.getElementById('finishDate').valueAsDate = new Date();
 
     const savedKey = localStorage.getItem('gemini_api_key');
@@ -157,12 +223,7 @@
       const cleanQuery = query.replace(/[- ]/g, '');
 
       try {
-        const searchTerms = [
-          `isbn:${cleanQuery}`,
-          `intitle:${query}`,
-          query
-        ];
-
+        const searchTerms = [`isbn:${cleanQuery}`, `intitle:${query}`, query];
         let gbItem = null;
 
         for (const term of searchTerms) {
@@ -183,8 +244,18 @@
           document.getElementById('titleOrig').value = info.subtitle || '';
           document.getElementById('authors').value = (info.authors || []).join(', ');
           document.getElementById('publisher').value = info.publisher || '';
-          document.getElementById('pubDate').value = `${info.publishedDate || ''} / ${(info.categories || []).join(', ')}`;
+          document.getElementById('pubDate').value = info.publishedDate || '';
           document.getElementById('summary').value = info.description || '（無簡介，可手動填寫）';
+
+          // 自動匹配或新增標籤
+          if (info.categories) {
+            info.categories.forEach(c => {
+              defaultCategories.forEach(dc => {
+                if (c.includes(dc) || dc.includes(c)) selectedCategories.add(dc);
+              });
+            });
+            renderCategories();
+          }
 
           const searchKey = encodeURIComponent(query);
           const linkEl = document.getElementById('booksLink');
@@ -210,7 +281,6 @@
         }
 
       } catch (err) {
-        console.warn('檢索出錯：', err);
         if (apiKey) {
           await fetchFromGeminiWithRetry(query, apiKey);
         } else {
@@ -222,7 +292,6 @@
       }
     }
 
-    // 備用 AI 檢索：精準使用當前官方最新模型 gemini-3.8-flash 並包含 503 重試退讓
     async function fetchFromGeminiWithRetry(query, apiKey) {
       const btn = document.getElementById('searchBtn');
       const systemPrompt = "你是一個圖書整理員。當收到書名或ISBN，請搜尋資料並以 strict JSON 格式回傳資訊。books_link 請輸出博客來最新搜尋格式：https://search.books.com.tw/search/query/key/【ISBN或關鍵字】/cat/all";
@@ -243,8 +312,6 @@
 
       let success = false;
       let lastError = '';
-
-      // 使用最新官方指定模型：gemini-3.8-flash
       const modelName = 'gemini-3.8-flash';
 
       for (let attempt = 1; attempt <= 3; attempt++) {
@@ -268,10 +335,9 @@
           });
 
           const result = await response.json();
-
           if (result.error) {
             lastError = result.error.message;
-            if (result.error.code === 503) continue; // 流量高峰 503 自動重試
+            if (result.error.code === 503) continue;
             break;
           }
 
@@ -281,9 +347,17 @@
           document.getElementById('titleOrig').value = bookData.book_title_original || '';
           document.getElementById('authors').value = (bookData.authors || []).join(', ');
           document.getElementById('publisher').value = bookData.publisher || '';
-          document.getElementById('pubDate').value = `${bookData.publication_date || ''} / ${(bookData.categories || []).join(', ')}`;
+          document.getElementById('pubDate').value = bookData.publication_date || '';
           document.getElementById('summary').value = bookData.summary || '';
           
+          if (bookData.categories) {
+            bookData.categories.forEach(c => {
+              if (!defaultCategories.includes(c)) defaultCategories.push(c);
+              selectedCategories.add(c);
+            });
+            renderCategories();
+          }
+
           const linkEl = document.getElementById('booksLink');
           const searchKey = encodeURIComponent(query);
           linkEl.href = bookData.books_link || `https://search.books.com.tw/search/query/key/${searchKey}/cat/all`;
@@ -333,7 +407,8 @@
     }
 
     function saveRecord() {
-      alert('紀錄已暫存！（下一步可為你串接 Google Sheets 或免費資料庫）');
+      const categoriesArray = Array.from(selectedCategories);
+      alert('已選擇的分類：' + (categoriesArray.join(', ') || '無') + '\n\n紀錄已暫存！準備接續串接資料庫與書櫃主頁。');
     }
   </script>
 </body>
